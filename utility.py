@@ -29,6 +29,9 @@ VAL_PATH = DATASET_PATH / 'val'
 TEST_PATH = DATASET_PATH / 'test'
 
 NUM_ELEMS = 10335
+SEED = 0
+
+random.seed(SEED)
 
 
 def fix_seg_names(seg_path=DATA_PATH / 'seg'):
@@ -79,6 +82,8 @@ def split_dataset(
     assert count(val_dir) == val_elems
     assert count(test_dir) == test_elems
 
+    print('Split eseguito')
+
 
 def _move_from_folder(num_elem, from_dir, to_dir):
     from_dir_rgb = from_dir / 'rgb'
@@ -121,7 +126,7 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
     test_seg = [f for f in (test_dir / 'seg').iterdir() if _is_valid_file(f)]
 
     if all(not bool(dir_) for dir_ in (train_rgb, test_rgb, val_rgb)):
-        print('Restore already done')
+        print('Restore già fatto')
         return
 
     move(train_rgb, rgb_dir)
@@ -132,7 +137,7 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
     move(val_seg, seg_dir)
     move(test_seg, seg_dir)
 
-    print('Restore eseguito!')
+    print('Restore eseguito')
 
 
 def move(data, dir_):
@@ -154,6 +159,3 @@ def info():
             print('DIR {} : FILES {}'.format(root, len(files)))
     _walk(DATA_PATH)
     _walk(DATASET_PATH)
-
-
-split_dataset()
