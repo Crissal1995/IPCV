@@ -49,7 +49,7 @@ def split_dataset(
         train_dir=TRAIN_PATH,
         val_dir=VAL_PATH,
         test_dir=TEST_PATH
-    ):
+):
     """
     train_val_test nel formato (train%, val%, test%)
     esempio (0.7, 0.15, 0.15)
@@ -58,71 +58,67 @@ def split_dataset(
     assert sum(t) == 1, 'Percentuale sbagliata! La somma non fa 1'
 
     count = lambda dir_: len(list((dir_ / 'rgb').glob('*')))
+
     total_elems = count(data_dir)
-    assert total_elems == NUM_ELEMS, 'Mancano elementi nel dataset'
+    assert total_elems == NUM_ELEMS, 'Mancano elementi nel dataset. Forse è già stato splittato?'
 
     train_elems = int(t[0] * total_elems)
     val_elems = int(t[1] * total_elems)
     test_elems = int(t[2] * total_elems)
 
     s = sum([train_elems, val_elems, test_elems])
-    if s < NUM_ELEMS:
-        diff = NUM_ELEMS - s
+    diff = NUM_ELEMS - s
+    if diff:
         test_elems += diff
 
-    _split_train_val(train_elems, data_dir, train_dir, val_dir)
-    _split_train_val(test_elems, val_dir, test_dir, val_dir)
+    _move_from_folder(train_elems, data_dir, train_dir)
+    _move_from_folder(val_elems, data_dir, val_dir)
+    _move_from_folder(test_elems, data_dir, test_dir)
 
     assert count(train_dir) == train_elems
     assert count(val_dir) == val_elems
     assert count(test_dir) == test_elems
 
 
-def _split_train_val(num_elem, data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH):
-    rgb_dir = data_dir / 'rgb'
-    seg_dir = data_dir / 'seg'
+def _move_from_folder(num_elem, from_dir, to_dir):
+    from_dir_rgb = from_dir / 'rgb'
+    from_dir_seg = from_dir / 'seg'
 
-    train_rgb = train_dir / 'rgb'
-    train_seg = train_dir / 'seg'
+    to_dir_rgb = to_dir / 'rgb'
+    to_dir_seg = to_dir / 'seg'
 
-    val_rgb = val_dir / 'rgb'
-    val_seg = val_dir / 'seg'
+    os.makedirs(to_dir_rgb, exist_ok=True)
+    os.makedirs(to_dir_seg, exist_ok=True)
 
-    all_rgb = [f for f in rgb_dir.iterdir() if f.is_file()]
-    all_seg = [f for f in seg_dir.iterdir() if f.is_file()]
+    assert all(dir_.exists() for dir_ in (from_dir_rgb, from_dir_seg, to_dir_rgb, to_dir_seg)), \
+        'Cartelle non valide! Al loro interno devono contenere necessariamente "rgb" e "seg"'
 
-    selected_rgb = random.sample(all_rgb, num_elem)
-    selected_seg = [seg for seg in all_seg if seg.stem in map(lambda path: path.stem, selected_rgb)]
+    rgbs = [f for f in from_dir_rgb.glob('*.jpg') if _is_valid_file(f)]
+    segs = [f for f in from_dir_seg.glob('*.png') if _is_valid_file(f)]
 
-    assert len(selected_rgb) == len(selected_seg), 'Mismatch fra immagine e maschera!'
+    assert len(rgbs) == len(segs), 'Mismatch in numero fra immagini e maschere!'
 
-    val_rgb = list(set(all_rgb) - set(selected_rgb))
-    val_seg = list(set(all_seg) - set(selected_seg))
+    selected_rgb = random.sample(rgbs, num_elem)
+    selected_seg = [seg for seg in segs if seg.stem in map(lambda path: path.stem, selected_rgb)]
 
-    os.makedirs(train_rgb, exist_ok=True)
-    os.makedirs(train_seg, exist_ok=True)
-    os.makedirs(val_rgb, exist_ok=True)
-    os.makedirs(val_seg, exist_ok=True)
+    assert len(selected_rgb) == len(selected_seg), 'Mismatch di elementi fra immagini e maschere!'
 
-    move(selected_rgb, train_rgb)
-    move(selected_seg, train_seg)
-
-    move(val_rgb, val_rgb)
-    move(val_seg, val_seg)
+    move(selected_rgb, to_dir_rgb)
+    move(selected_seg, to_dir_seg)
 
 
 def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, test_dir=TEST_PATH):
     rgb_dir = data_dir / 'rgb'
     seg_dir = data_dir / 'seg'
 
-    train_rgb = [f for f in (train_dir / 'rgb').iterdir() if f.is_file()]
-    train_seg = [f for f in (train_dir / 'seg').iterdir() if f.is_file()]
+    train_rgb = [f for f in (train_dir / 'rgb').iterdir() if _is_valid_file(f)]
+    train_seg = [f for f in (train_dir / 'seg').iterdir() if _is_valid_file(f)]
 
-    val_rgb = [f for f in (val_dir / 'rgb').iterdir() if f.is_file()]
-    val_seg = [f for f in (val_dir / 'seg').iterdir() if f.is_file()]
+    val_rgb = [f for f in (val_dir / 'rgb').iterdir() if _is_valid_file(f)]
+    val_seg = [f for f in (val_dir / 'seg').iterdir() if _is_valid_file(f)]
 
-    test_rgb = [f for f in (test_dir / 'rgb').iterdir() if f.is_file()]
-    test_seg = [f for f in (test_dir / 'seg').iterdir() if f.is_file()]
+    test_rgb = [f for f in (test_dir / 'rgb').iterdir() if _is_valid_file(f)]
+    test_seg = [f for f in (test_dir / 'seg').iterdir() if _is_valid_file(f)]
 
     if all(not bool(dir_) for dir_ in (train_rgb, test_rgb, val_rgb)):
         print('Restore already done')
@@ -141,7 +137,23 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
 
 def move(data, dir_):
     for d in data:
-        try:
-            shutil.move(str(d), str(dir_))
-        except shutil.Error:  # strano bug che esegue di nuovo la move dopo aver terminato
-            return
+        shutil.move(str(d), str(dir_))
+
+
+def _is_valid_file(file):
+    return file.is_file() and not file.stem.startswith('.')
+
+
+def info():
+    def _walk(path):
+        for root, dirs, files in os.walk(path):
+            if root.startswith('.'):
+                continue
+            if not files:
+                continue
+            print('DIR {} : FILES {}'.format(root, len(files)))
+    _walk(DATA_PATH)
+    _walk(DATASET_PATH)
+
+
+split_dataset()
