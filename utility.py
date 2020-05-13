@@ -28,15 +28,20 @@ TRAIN_PATH = DATASET_PATH / 'train'
 VAL_PATH = DATASET_PATH / 'val'
 TEST_PATH = DATASET_PATH / 'test'
 
-NUM_ELEMS = 10335
+NUM_ELEMENTS = 10335
 SEED = 0
-
 random.seed(SEED)
+
+
+def change_seed(seed=None):
+    if seed is None:
+        seed = random.randint(0, 2**32 - 1)
+    random.seed(seed)
 
 
 def fix_seg_names(seg_path=DATA_PATH / 'seg'):
     segs = [seg for seg in seg_path.glob('*.png') if seg.is_file() and not seg.stem.startswith('.')]
-    assert len(segs) == NUM_ELEMS, 'Elementi mancanti! Riscarica il dataset'
+    assert len(segs) == NUM_ELEMENTS, 'Elementi mancanti! Riscarica il dataset'
     segs = [seg for seg in segs if seg.stem.startswith('seg_')]
     if not segs:
         print('Names already fixed!')
@@ -56,21 +61,30 @@ def split_dataset(
     """
     train_val_test nel formato (train%, val%, test%)
     esempio (0.7, 0.15, 0.15)
+
+    se verranno passati due soli valori, il validation sarà vuoto
+    e sarà tutto train e test
     """
     t = train_val_test_tuple
     assert sum(t) == 1, 'Percentuale sbagliata! La somma non fa 1'
 
+    assert len(t) in (2, 3), \
+        'Numero di parametri nella tupla errato! Solo due (train, test) o tre (train, val, test) permessi'
+
+    if len(t) == 2:
+        t = (t[0], 0, t[1])
+
     count = lambda dir_: len(list((dir_ / 'rgb').glob('*')))
 
     total_elems = count(data_dir)
-    assert total_elems == NUM_ELEMS, 'Mancano elementi nel dataset. Forse è già stato splittato?'
+    assert total_elems == NUM_ELEMENTS, 'Mancano elementi nel dataset. Forse è già stato splittato?'
 
     train_elems = int(t[0] * total_elems)
     val_elems = int(t[1] * total_elems)
     test_elems = int(t[2] * total_elems)
 
     s = sum([train_elems, val_elems, test_elems])
-    diff = NUM_ELEMS - s
+    diff = NUM_ELEMENTS - s
     if diff:
         test_elems += diff
 
@@ -94,6 +108,9 @@ def _move_from_folder(num_elem, from_dir, to_dir):
 
     os.makedirs(to_dir_rgb, exist_ok=True)
     os.makedirs(to_dir_seg, exist_ok=True)
+
+    if not num_elem:
+        return
 
     assert all(dir_.exists() for dir_ in (from_dir_rgb, from_dir_seg, to_dir_rgb, to_dir_seg)), \
         'Cartelle non valide! Al loro interno devono contenere necessariamente "rgb" e "seg"'
