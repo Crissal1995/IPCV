@@ -142,7 +142,8 @@ def _move_from_folder(num_elem, from_dir, to_dir, tqdm_progress=None):
     assert len(rgbs) == len(segs), 'Mismatch in numero fra immagini e maschere!'
 
     selected_rgb = random.sample(rgbs, num_elem)
-    selected_seg = [seg for seg in segs if seg.stem in map(lambda path: path.stem, selected_rgb)]
+    selected_stems = [rgb.stem for rgb in selected_rgb]
+    selected_seg = [seg for seg in segs if seg.stem in selected_stems]
 
     assert len(selected_rgb) == len(selected_seg), 'Mismatch di elementi fra immagini e maschere!'
 
@@ -163,9 +164,18 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
     test_rgb = [f for f in (test_dir / 'rgb').iterdir() if _is_valid_file(f)]
     test_seg = [f for f in (test_dir / 'seg').iterdir() if _is_valid_file(f)]
 
-    if all(not bool(dir_) for dir_ in (train_rgb, test_rgb, val_rgb)):
+    seg_dirs = (train_seg, val_seg, test_seg)
+    rgb_dirs = (train_rgb, val_rgb, test_rgb)
+    dirs = seg_dirs + rgb_dirs
+
+    assert all(len(rgb) == len(seg) for (rgb, seg) in zip(rgb_dirs, seg_dirs)), \
+        'Mismatch in numero fra RGB e SEG in almeno una cartella'
+
+    if all(not d for d in rgb_dirs):
         print('Restore già fatto')
         return
+
+    assert sum(len(d) for d in dirs) == 2*NUM_ELEMENTS, 'Mancano elementi nelle cartelle! Riscaricare il dataset'
 
     print('Restore iniziato')
     time.sleep(.1)
