@@ -1,7 +1,14 @@
 import pathlib
 import shutil
 import random
+import time
 import os
+
+try:
+    from tqdm import tqdm
+    has_tqdm = True
+except ImportError:
+    has_tqdm = False
 
 """
 Bisogna avere il dataset originale in una cartella chiamata "sunrgb"
@@ -41,14 +48,20 @@ def change_seed(seed=None):
 
 def fix_seg_names(seg_path=DATA_PATH / 'seg'):
     segs = [seg for seg in seg_path.glob('*.png') if seg.is_file() and not seg.stem.startswith('.')]
-    assert len(segs) == NUM_ELEMENTS, 'Elementi mancanti! Riscarica il dataset'
+    assert len(segs) == NUM_ELEMENTS, 'fix_seg_names() già eseguita oppure dataset incompleto'
     segs = [seg for seg in segs if seg.stem.startswith('seg_')]
     if not segs:
-        print('Names already fixed!')
+        print('Nomi già fixati')
         return
+
+    t = tqdm(total=len(segs)) if has_tqdm else None
     for seg in segs:
         id_ = seg.stem.split('_')[1]
         seg.rename(seg.parent / ('img_' + id_ + '.png'))
+        if has_tqdm:
+            t.update()
+    if has_tqdm:
+        t.close()
 
 
 def split_dataset(
@@ -88,9 +101,17 @@ def split_dataset(
     if diff:
         test_elems += diff
 
-    _move_from_folder(train_elems, data_dir, train_dir)
-    _move_from_folder(val_elems, data_dir, val_dir)
-    _move_from_folder(test_elems, data_dir, test_dir)
+    print('Split iniziato')
+    time.sleep(.1)
+
+    t = tqdm(total=2*NUM_ELEMENTS) if has_tqdm else None
+
+    _move_from_folder(train_elems, data_dir, train_dir, t)
+    _move_from_folder(val_elems, data_dir, val_dir, t)
+    _move_from_folder(test_elems, data_dir, test_dir, t)
+
+    if has_tqdm:
+        t.close()
 
     assert count(train_dir) == train_elems
     assert count(val_dir) == val_elems
@@ -99,7 +120,7 @@ def split_dataset(
     print('Split eseguito')
 
 
-def _move_from_folder(num_elem, from_dir, to_dir):
+def _move_from_folder(num_elem, from_dir, to_dir, tqdm_progress=None):
     from_dir_rgb = from_dir / 'rgb'
     from_dir_seg = from_dir / 'seg'
 
@@ -112,7 +133,7 @@ def _move_from_folder(num_elem, from_dir, to_dir):
     if not num_elem:
         return
 
-    assert all(dir_.exists() for dir_ in (from_dir_rgb, from_dir_seg, to_dir_rgb, to_dir_seg)), \
+    assert all(dir_.exists() for dir_ in (from_dir_rgb, from_dir_seg)), \
         'Cartelle non valide! Al loro interno devono contenere necessariamente "rgb" e "seg"'
 
     rgbs = [f for f in from_dir_rgb.glob('*.jpg') if _is_valid_file(f)]
@@ -125,8 +146,8 @@ def _move_from_folder(num_elem, from_dir, to_dir):
 
     assert len(selected_rgb) == len(selected_seg), 'Mismatch di elementi fra immagini e maschere!'
 
-    move(selected_rgb, to_dir_rgb)
-    move(selected_seg, to_dir_seg)
+    move(selected_rgb, to_dir_rgb, tqdm_progress)
+    move(selected_seg, to_dir_seg, tqdm_progress)
 
 
 def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, test_dir=TEST_PATH):
@@ -146,20 +167,30 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
         print('Restore già fatto')
         return
 
-    move(train_rgb, rgb_dir)
-    move(val_rgb, rgb_dir)
-    move(test_rgb, rgb_dir)
+    print('Restore iniziato')
+    time.sleep(.1)
 
-    move(train_seg, seg_dir)
-    move(val_seg, seg_dir)
-    move(test_seg, seg_dir)
+    t = tqdm(total=2*NUM_ELEMENTS) if has_tqdm else None
+
+    move(train_rgb, rgb_dir, t)
+    move(val_rgb, rgb_dir, t)
+    move(test_rgb, rgb_dir, t)
+
+    move(train_seg, seg_dir, t)
+    move(val_seg, seg_dir, t)
+    move(test_seg, seg_dir, t)
+
+    if has_tqdm:
+        t.close()
 
     print('Restore eseguito')
 
 
-def move(data, dir_):
+def move(data, dir_, tqdm_progress=None):
     for d in data:
         shutil.move(str(d), str(dir_))
+        if tqdm_progress:
+            tqdm_progress.update()
 
 
 def _is_valid_file(file):
