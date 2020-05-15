@@ -1,14 +1,12 @@
 import pathlib
 import shutil
 import random
-import time
 import os
 
 try:
     from tqdm import tqdm
-    has_tqdm = True
 except ImportError:
-    has_tqdm = False
+    tqdm = False
 
 """
 Bisogna avere il dataset originale in una cartella chiamata "sunrgb"
@@ -28,6 +26,7 @@ root
         | - rgb
         | - seg
 """
+
 DATA_PATH = pathlib.Path() / 'sunrgb'
 DATASET_PATH = pathlib.Path() / 'dataset'
 
@@ -54,13 +53,15 @@ def fix_seg_names(seg_path=DATA_PATH / 'seg'):
         print('Nomi già fixati')
         return
 
-    t = tqdm(total=len(segs)) if has_tqdm else None
+    t = tqdm(total=len(segs)) if tqdm else None
+
     for seg in segs:
         id_ = seg.stem.split('_')[1]
         seg.rename(seg.parent / ('img_' + id_ + '.png'))
-        if has_tqdm:
+        if tqdm:
             t.update()
-    if has_tqdm:
+
+    if tqdm:
         t.close()
 
 
@@ -101,23 +102,18 @@ def split_dataset(
     if diff:
         test_elems += diff
 
-    print('Split iniziato')
-    time.sleep(.1)
-
-    t = tqdm(total=2*NUM_ELEMENTS) if has_tqdm else None
+    t = tqdm(total=2*NUM_ELEMENTS) if tqdm else None
 
     _move_from_folder(train_elems, data_dir, train_dir, t)
     _move_from_folder(val_elems, data_dir, val_dir, t)
     _move_from_folder(test_elems, data_dir, test_dir, t)
 
-    if has_tqdm:
+    if tqdm:
         t.close()
 
     assert count(train_dir) == train_elems
     assert count(val_dir) == val_elems
     assert count(test_dir) == test_elems
-
-    print('Split eseguito')
 
 
 def _move_from_folder(num_elem, from_dir, to_dir, tqdm_progress=None):
@@ -177,10 +173,7 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
 
     assert sum(len(d) for d in dirs) == 2*NUM_ELEMENTS, 'Mancano elementi nelle cartelle! Riscaricare il dataset'
 
-    print('Restore iniziato')
-    time.sleep(.1)
-
-    t = tqdm(total=2*NUM_ELEMENTS) if has_tqdm else None
+    t = tqdm(total=2*NUM_ELEMENTS) if tqdm else None
 
     move(train_rgb, rgb_dir, t)
     move(val_rgb, rgb_dir, t)
@@ -190,10 +183,8 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
     move(val_seg, seg_dir, t)
     move(test_seg, seg_dir, t)
 
-    if has_tqdm:
+    if tqdm:
         t.close()
-
-    print('Restore eseguito')
 
 
 def move(data, dir_, tqdm_progress=None):
