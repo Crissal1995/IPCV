@@ -55,8 +55,8 @@ class CheckpointsCallback(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         if self.checkpoints_path is not None:
-            self.model.save_weights(self.checkpoints_path + "." + str(epoch))
-            print("saved ", self.checkpoints_path + "." + str(epoch))
+            self.model.save_weights(self.checkpoints_path + "cp." + str(epoch))
+            print("saved ", self.checkpoints_path + "cp." + str(epoch))
 
 
 def train(model,
