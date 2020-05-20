@@ -57,13 +57,13 @@ from keras_segmentation.models.pspnet import resnet50_pspnet
 
 pretrained_model = pspnet_50_ADE_20K()
 #pretrained_model = resnet_pspnet_VOC12_v0_1()
-model = pspnet_50( n_classes=38 ) # accuracy: 0.5348
+model = pspnet_50( n_classes=38 ) # accuracy: 0.5348 10 epochs
 #model = resnet50_pspnet( n_classes=38 ) # accuracy: 0.5154 - frequency_weighted_IU': 0.3473552042914965, 'mean_IU': 0.10207884596666351
 
 transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
 
 
-trainingMode = False
+trainingMode = True
 
 if trainingMode:
     #model = fcn_32(n_classes=38 ,  input_height=224, input_width=320  )
@@ -73,8 +73,9 @@ if trainingMode:
     model.train(
         train_images =  "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/train/rgb/",
         train_annotations = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/train/seg/",
-        checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_4/", 
-        epochs=5
+        checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/",
+        batch_size = 6,
+        epochs = 27
     )
     #,
         #do_augment=True,
@@ -82,7 +83,7 @@ if trainingMode:
         #steps_per_epoch=512,
         #batch_size=2
 else:
-    checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_4/"
+    checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/"
     #from models.all_models import model_from_name
     #model_from_name["vgg_unet"] = unet.vgg_unet
     full_config_path = checkpoints_path+"_config.json"
@@ -122,13 +123,13 @@ else:
         # evaluating the model 
         print(model.evaluate_segmentation( inp_images_dir=inp_dir  , annotations_dir=ann_dir ) )
     
-    elif checkpoints_path == "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_4/":
+    elif checkpoints_path == "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/":
         sun_inp_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/rgb/"
         sun_ann_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/seg/"
         
         out = model.predict_segmentation(
             inp=sun_inp_dir+"img_00005.png",
-            out_fname="C:/Users/UC/Desktop/image-segmentation-keras-master/tmp/sun_out_3.png"
+            out_fname="C:/Users/UC/Desktop/image-segmentation-keras-master/tmp/sun_out_5.png"
         )
         
         import matplotlib.pyplot as plt

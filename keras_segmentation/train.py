@@ -23,7 +23,7 @@ def find_latest_checkpoint(checkpoints_path, fail_safe=True):
         return re.sub('\D', '',path)
 
     # Get all matching files
-    all_checkpoint_files = glob.glob(checkpoints_path + ".*")
+    all_checkpoint_files = glob.glob(checkpoints_path + "cp.*")
     # Filter out entries where the epoc_number part is pure number
     all_checkpoint_files = list(filter(lambda f: get_epoch_number_from_path(f)
                                        .isdigit(), all_checkpoint_files))
