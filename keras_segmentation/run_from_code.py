@@ -111,6 +111,7 @@ else:
     if checkpoints_path == "C:/Users/UC/Desktop/image-segmentation-keras-master/checkpoints/":
         inp_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/dataset1/images_prepped_test/"
         ann_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/dataset1/annotations_prepped_test/"
+        print("Maria è stata qui")
         
         out = model.predict_segmentation(
             inp=inp_dir+"0016E5_07965.png",
