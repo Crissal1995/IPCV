@@ -13,6 +13,14 @@ import glob
 import six
 from keras.callbacks import Callback
 import re
+from keras import backend as K
+
+
+def jaccard_distance(y_true, y_pred, smooth=100):
+    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
+    sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis=-1)
+    jac = (intersection + smooth) / (sum_ - intersection + smooth)
+    return (1 - jac) * smooth
 
 
 def find_latest_checkpoint(checkpoints_path, fail_safe=True):
@@ -115,7 +123,8 @@ def train(model,
         if ignore_zero_class:
             loss_k = masked_categorical_crossentropy
         else:
-            loss_k = 'categorical_crossentropy'
+            #loss_k = 'categorical_crossentropy'
+            loss_k = jaccard_distance
 
         model.compile(loss=loss_k,
                       optimizer=optimizer_name,
