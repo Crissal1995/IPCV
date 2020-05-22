@@ -17,8 +17,13 @@ from keras import backend as K
 from time import time
 from keras.callbacks import TensorBoard
 from keras import metrics
+# import tensorflow as tf
 
-
+# class MeanIoU(metrics.MeanIoU):
+#     def __call__(self, y_true, y_pred, sample_weight=None):
+#         y_pred = tf.argmax(y_pred, axis=-1)
+#         return super().__call__(y_true, y_pred, sample_weight=sample_weight)
+    
 def jaccard_distance(y_true, y_pred, smooth=100):
     intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
     sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis=-1)
@@ -133,7 +138,7 @@ def train(model,
         model.compile(loss=loss_k,
                       optimizer=optimizer_name,
                       #metrics=['accuracy'])
-                      metrics=[metrics.MeanIoU(num_classes=n_classes)])
+                      metrics=['accuracy', metrics.MeanIoU(name='model_iou', num_classes=n_classes)])
 
     if checkpoints_path is not None:
         with open(checkpoints_path+"_config.json", "w") as f:
