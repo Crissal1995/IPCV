@@ -132,7 +132,8 @@ def train(model,
 
         model.compile(loss=loss_k,
                       optimizer=optimizer_name,
-                      metrics=[metrics.MeanIoU(num_classes=n_classes),'accuracy'])
+                      #metrics=['accuracy'])
+                      metrics=[metrics.MeanIoU(num_classes=n_classes)])
 
     if checkpoints_path is not None:
         with open(checkpoints_path+"_config.json", "w") as f:
