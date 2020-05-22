@@ -14,6 +14,8 @@ import six
 from keras.callbacks import Callback
 import re
 from keras import backend as K
+from time import time
+from keras.callbacks import TensorBoard
 
 
 def jaccard_distance(y_true, y_pred, smooth=100):
@@ -65,6 +67,7 @@ class CheckpointsCallback(Callback):
         if self.checkpoints_path is not None:
             self.model.save_weights(self.checkpoints_path + "cp." + str(epoch))
             print("saved ", self.checkpoints_path + "cp." + str(epoch))
+            TensorBoard(log_dir='logs/{}'.format(time()))
 
 
 def train(model,
