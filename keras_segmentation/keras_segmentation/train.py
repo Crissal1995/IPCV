@@ -16,6 +16,7 @@ import re
 from keras import backend as K
 from time import time
 from keras.callbacks import TensorBoard
+from keras import metrics
 
 
 def jaccard_distance(y_true, y_pred, smooth=100):
@@ -131,7 +132,7 @@ def train(model,
 
         model.compile(loss=loss_k,
                       optimizer=optimizer_name,
-                      metrics=['accuracy'])
+                      metrics=[metrics.MeanIoU(num_classes=n_classes),'accuracy'])
 
     if checkpoints_path is not None:
         with open(checkpoints_path+"_config.json", "w") as f:
