@@ -213,8 +213,8 @@ def interp_block(prev_layer, level, feature_map_shape, input_shape):
                               2: 45,
                               3: 30,
                               6: 15}
-	elif input_shape == (256, 256):
-		# Custom shape
+    elif input_shape == (256, 256):
+	    # Custom shape
         kernel_strides_map = {1: 30,
                               2: 15,
                               3: 10,
