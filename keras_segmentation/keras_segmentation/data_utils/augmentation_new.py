@@ -130,7 +130,7 @@ def _load_augmentation_aug_all():
                     0, 2.0)),  # emboss images
                 # search either for all edges or for directed edges,
                 # blend the result with the original image using a blobby mask
-                iaa.SimplexNoiseAlpha(iaa.OneOf([
+                iaa.BlendAlphaSimplexNoise(iaa.OneOf([
                     iaa.EdgeDetect(alpha=(0.5, 1.0)),
                     iaa.DirectedEdgeDetect(
                         alpha=(0.5, 1.0), direction=(0.0, 1.0)),
@@ -155,16 +155,16 @@ def _load_augmentation_aug_all():
                 iaa.OneOf([
                     iaa.Multiply(
                                 (0.5, 1.5), per_channel=0.5),
-                    iaa.FrequencyNoiseAlpha(
+                    iaa.BlendAlphaFrequencyNoise(
                         exponent=(-4, 0),
-                        first=iaa.Multiply(
+                        foreground=iaa.Multiply(
                             (0.5, 1.5), per_channel=True),
-                        second=iaa.ContrastNormalization(
+                        background=iaa.contrast.LinearContrast(
                             (0.5, 2.0))
                     )
                 ]),
                 # improve or worsen the contrast
-                iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5),
+                iaa.contrast.LinearContrast((0.5, 2.0), per_channel=0.5),
                 iaa.Grayscale(alpha=(0.0, 1.0)),
                 # move pixels locally around (with random strengths)
                 sometimes(iaa.ElasticTransformation(
@@ -212,7 +212,7 @@ def _augment_seg(img, seg, augmentation_name="aug_all"):
     # Augment the input image
     image_aug = aug_det.augment_image(img)
 
-    segmap = ia.SegmentationMapOnImage(
+    segmap = ia.SegmentationMapsOnImage(
         seg, nb_classes=np.max(seg) + 1, shape=img.shape)
     segmap_aug = aug_det.augment_segmentation_maps(segmap)
     segmap_aug = segmap_aug.get_arr_int()
