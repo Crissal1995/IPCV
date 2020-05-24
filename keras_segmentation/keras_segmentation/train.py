@@ -16,7 +16,7 @@ import re
 from keras import backend as K
 from time import time
 from keras.callbacks import TensorBoard
-from keras import metrics
+#from keras import metrics
 # import tensorflow as tf
 
 # class MeanIoU(metrics.MeanIoU):
@@ -97,6 +97,8 @@ def train(model,
           gen_use_multiprocessing=False,
           ignore_zero_class=False,
           optimizer_name='adadelta',
+          loss_type='categorical_crossentropy',
+          metrics_used=['accuracy'],
           do_augment=False,
           augmentation_name="aug_all"):
 
@@ -129,16 +131,19 @@ def train(model,
 
     if optimizer_name is not None:
 
-        if ignore_zero_class:
-            loss_k = masked_categorical_crossentropy
-        else:
-            #loss_k = 'categorical_crossentropy'
-            loss_k = jaccard_distance
+        # if ignore_zero_class:
+        #     loss_k = masked_categorical_crossentropy
+        # else:
+        #     #loss_k = 'categorical_crossentropy'
+        #     loss_k = jaccard_distance
 
-        model.compile(loss=loss_k,
+        # model.compile(loss=loss_k,
+        #               optimizer=optimizer_name,
+        #               #metrics=['accuracy'])
+        #               metrics=['accuracy', metrics.MeanIoU(name='model_iou', num_classes=n_classes)])
+        model.compile(loss=loss_type,
                       optimizer=optimizer_name,
-                      #metrics=['accuracy'])
-                      metrics=['accuracy', metrics.MeanIoU(name='model_iou', num_classes=n_classes)])
+                      metrics=metrics_used)
 
     if checkpoints_path is not None:
         with open(checkpoints_path+"_config.json", "w") as f:

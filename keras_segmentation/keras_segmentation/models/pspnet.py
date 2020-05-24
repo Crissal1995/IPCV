@@ -98,6 +98,19 @@ def resnet50_pspnet(n_classes,  input_height=384, input_width=576):
     return model
 
 
+# Custom model
+def pspnet_50_slim(n_classes,  input_height=256, input_width=256):
+    from ._pspnet_2 import _build_pspnet
+
+    nb_classes = n_classes
+    resnet_layers = 50
+    input_shape = (input_height, input_width)
+    model = _build_pspnet(nb_classes=nb_classes,
+                          resnet_layers=resnet_layers,
+                          input_shape=input_shape)
+    model.model_name = "pspnet_50_slim"
+    return model
+
 def pspnet_50(n_classes,  input_height=473, input_width=473):
     from ._pspnet_2 import _build_pspnet
 
