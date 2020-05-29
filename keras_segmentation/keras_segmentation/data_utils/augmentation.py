@@ -213,9 +213,10 @@ def _augment_seg(img, seg, augmentation_name="aug_all"):
     image_aug = aug_det.augment_image(img)
 
     segmap = ia.SegmentationMapsOnImage(
-        seg, nb_classes=np.max(seg) + 1, shape=img.shape)
+        seg, shape=img.shape)
+        #seg, nb_classes=np.max(seg) + 1, shape=img.shape)
     segmap_aug = aug_det.augment_segmentation_maps(segmap)
-    segmap_aug = segmap_aug.get_arr_int()
+    segmap_aug = segmap_aug.get_arr()
 
     return image_aug, segmap_aug
 
