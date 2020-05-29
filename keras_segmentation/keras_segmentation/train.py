@@ -204,6 +204,7 @@ def train(model,
                             validation_data=val_gen,
                             validation_steps=val_steps_per_epoch,
                             epochs=epochs, callbacks=callbacks,
+                            workers=8,
                             use_multiprocessing=gen_use_multiprocessing)
     
     # list all data in history
