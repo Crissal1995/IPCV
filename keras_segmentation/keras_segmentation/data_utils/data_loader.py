@@ -209,7 +209,6 @@ def image_segmentation_generator(images_path, segs_path, batch_size,
         X = []
         Y = []
         for _ in range(batch_size):
-            print("batch initialized")
             im, seg = next(zipped)
 
             im = cv2.imread(im, 1)
@@ -225,28 +224,3 @@ def image_segmentation_generator(images_path, segs_path, batch_size,
                 seg, n_classes, output_width, output_height))
 
         yield np.array(X), np.array(Y)
-
-def data_gen(img_folder, mask_folder, batch_size):
-    c = 0
-    images = os.listdir(img_folder)
-    while True:
-        img = np.zeros((batch_size, 512, 512, 3)).astype('float')
-        mask = np.zeros((batch_size, 512, 512, 1)).astype('float')
-        for i in range(c, c + batch_size):
-            image = images[i]
-            mask = image.replace('.jpg', '.png')
-            train_img = cv2.imread(img_folder+'/'+image)/255.
-            train_img = cv2.resize(train_img, (512, 512, 3))
-            img[i-c] = train_img
-            train_mask = cv2.imread(
-                mask_folder+'/'+mask,
-                cv2.IMREAD_GRAYSCALE)/255.
-            train_mask = cv2.resize(train_mask, (512, 512))
-            train_mask = train_mask.reshape(512, 512, 1)
-            mask[i-c] = train_mask
-            c += batch_size
-            if c + batch_size >= len(images):
-                c = 0
-                yield img, mask
-                raise StopIteration
-        yield img, mask
