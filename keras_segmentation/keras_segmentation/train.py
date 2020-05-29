@@ -15,6 +15,7 @@ from keras.callbacks import Callback
 import re
 from keras import backend as K
 from time import time
+import matplotlib.pyplot as plt
 from keras.callbacks import TensorBoard
 #from keras import metrics
 # import tensorflow as tf
@@ -70,7 +71,7 @@ class CheckpointsCallback(Callback):
         self.checkpoints_path = checkpoints_path
 
     def on_epoch_end(self, epoch, logs=None):
-        if self.checkpoints_path is not None:
+        if self.checkpoints_path is not None and (epoch+1)%5 == 0:
             self.model.save_weights(self.checkpoints_path + "cp." + str(epoch))
             print("saved ", self.checkpoints_path + "cp." + str(epoch))
             TensorBoard(log_dir='logs/{}'.format(time()))
@@ -195,12 +196,39 @@ def train(model,
     ]
 
     if not validate:
-        model.fit_generator(train_gen, steps_per_epoch,
+        history = model.fit_generator(train_gen, steps_per_epoch,
                             epochs=epochs, callbacks=callbacks)
     else:
-        model.fit_generator(train_gen,
+        history = model.fit_generator(train_gen,
                             steps_per_epoch,
                             validation_data=val_gen,
                             validation_steps=val_steps_per_epoch,
                             epochs=epochs, callbacks=callbacks,
                             use_multiprocessing=gen_use_multiprocessing)
+    
+    # list all data in history
+    print(history.history.keys())
+    # summarize history for accuracy
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.show()
+    # summarize history for loss
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.show()
+    # summarize history for loss
+    plt.plot(history.history['mean_iou'])
+    plt.plot(history.history['val_mean_iou'])
+    plt.title('model mean IOU')
+    plt.ylabel('mean_iou')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.show()

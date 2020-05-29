@@ -54,6 +54,53 @@ from keras_segmentation.pretrained import pspnet_50_ADE_20K
 from keras_segmentation.pretrained import resnet_pspnet_VOC12_v0_1
 from keras_segmentation.models.pspnet import pspnet_50
 from keras_segmentation.models.pspnet import resnet50_pspnet
+from keras import backend as K
+from keras import metrics
+from keras import losses
+from keras import optimizers
+from keras_segmentation.data_utils.data_loader import image_segmentation_generator, \
+        verify_segmentation_dataset
+
+def pspnet_50_slim(n_classes,  input_height=256, input_width=256):
+    from keras_segmentation.models._pspnet_2 import _build_pspnet
+
+    nb_classes = n_classes
+    resnet_layers = 50
+    input_shape = (input_height, input_width)
+    model = _build_pspnet(nb_classes=nb_classes,
+                          resnet_layers=resnet_layers,
+                          input_shape=input_shape)
+    model.model_name = "pspnet_50_slim"
+    return model
+
+def jaccard_distance(y_true, y_pred, smooth=100):
+    intersection = K.sum(K.abs(y_true * y_pred), axis = -1)
+    sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis = -1)
+    jac = (intersection + smooth) / (sum_ - intersection + smooth)
+    return (1 - jac) * smooth
+
+def masked_categorical_crossentropy(gt, pr):
+    from keras.losses import categorical_crossentropy
+    mask = 1 - gt[:, :, 0]
+    return categorical_crossentropy(gt, pr) * mask
+
+def jaccard_crossentropy(out, tar):
+    return losses.categorical_crossentropy(out, tar) + jaccard_distance(out, tar)
+
+def dice_coef(y_true, y_pred, smooth=1):
+    """
+    Dice = (2*|X & Y|)/ (|X|+ |Y|)
+         =  2*sum(|A*B|)/(sum(A^2)+sum(B^2))
+    ref: https://arxiv.org/pdf/1606.04797v1.pdf
+    """
+    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
+    return (2. * intersection + smooth) / (K.sum(K.square(y_true),-1) + K.sum(K.square(y_pred),-1) + smooth)
+
+def dice_coef_loss(y_true, y_pred):
+    return 1-dice_coef(y_true, y_pred)
+
+def dice_crossentropy(out, tar):
+    return losses.categorical_crossentropy(out, tar) + dice_coef_loss(out, tar)
 
 pretrained_model = pspnet_50_ADE_20K()
 #pretrained_model = resnet_pspnet_VOC12_v0_1()
@@ -64,26 +111,62 @@ transfer_weights( pretrained_model , model  ) # transfer weights from pre-traine
 
 
 trainingMode = True
+evaluate = False
 
 if trainingMode:
     #model = fcn_32(n_classes=38 ,  input_height=224, input_width=320  )
     # model = vgg_unet(n_classes=38 ,  input_height=416, input_width=608  )
     #model = vgg_unet(n_classes=38 ,  input_height=416, input_width=608  )
+    
+    opt = optimizers.Adam(learning_rate=0.005)
+    if os.name == 'nt':
+        init = "C:/Users/UC/Desktop/"
+    else:
+        init = "/Users/salvatorecapuozzo/Desktop/"
+        
+    train_images =  init+"sunrgb/train/rgb/"
+    train_annotations = init+"sunrgb/train/seg/"
+    val_images =  init+"sunrgb/val/rgb/",
+    val_annotations = init+"sunrgb/val/seg/",
+    train_images_2 =  init+"half_sunrgb/train/rgb/"
+    train_annotations_2 = init+"half_sunrgb/train/seg/"
+    val_images_2 =  init+"half_sunrgb/val/rgb/",
+    val_annotations_2 = init+"half_sunrgb/val/seg/",
+    n_classes = model.n_classes
+    input_height = model.input_height
+    input_width = model.input_width
+    output_height = model.output_height
+    output_width = model.output_width
 
     model.train(
-        train_images =  "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/train/rgb/",
-        train_annotations = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/train/seg/",
-        checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/",
-        batch_size = 6,
-        epochs = 27
+        train_images =  train_images,
+        train_annotations = train_annotations,
+        val_images = init+"sunrgb/val/rgb/",
+        val_annotations = init+"sunrgb/val/seg/",
+        checkpoints_path = init,
+        batch_size = 2,
+        steps_per_epoch = 512,
+        val_batch_size = 1,
+        n_classes = 38,
+        validate = True,
+        verify_dataset = False,
+        optimizer_name = opt,
+        loss_type = dice_crossentropy,
+        metrics_used = ['accuracy', metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
+        do_augment = True,
+        gen_use_multiprocessing = False,
+        ignore_zero_class = False,
+        epochs = 1
     )
-    #,
-        #do_augment=True,
-        #ignore_zero_class=True,
-        #steps_per_epoch=512,
-        #batch_size=2
+    
+    # print(model.summary())
+    # print(model.evaluate_segmentation( 
+    #         inp_images_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/rgb/", 
+    #         annotations_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/seg/"
+    #     ))
 else:
-    checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/"
+    #checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/"
+    checkpoints_path = "/Users/salvatorecapuozzo/Desktop/new_jce/"
     #from models.all_models import model_from_name
     #model_from_name["vgg_unet"] = unet.vgg_unet
     full_config_path = checkpoints_path+"_config.json"
@@ -121,19 +204,21 @@ else:
         plt.imshow(out)
         
         # evaluating the model 
-        print(model.evaluate_segmentation( inp_images_dir=inp_dir  , annotations_dir=ann_dir ) )
+        if evaluate:
+            print(model.evaluate_segmentation( inp_images_dir=inp_dir  , annotations_dir=ann_dir ) )
     
-    elif checkpoints_path == "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/":
-        sun_inp_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/rgb/"
-        sun_ann_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/seg/"
+    elif checkpoints_path == "/Users/salvatorecapuozzo/Desktop/new_jce/":
+        sun_inp_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/rgb/"
+        sun_ann_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/seg/"
         
         out = model.predict_segmentation(
-            inp=sun_inp_dir+"img_00005.png",
-            out_fname="C:/Users/UC/Desktop/image-segmentation-keras-master/tmp/sun_out_5.png"
+            inp=sun_inp_dir+"img_00005.jpg",
+            out_fname="/Users/salvatorecapuozzo/Desktop/sun_out_29_05.png"
         )
         
         import matplotlib.pyplot as plt
         plt.imshow(out)
         
-        # evaluating the model 
-        print(model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) )
+        # evaluating the model
+        if evaluate:
+            print(model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) )
