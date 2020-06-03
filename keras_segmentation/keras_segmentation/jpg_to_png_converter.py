@@ -32,10 +32,10 @@ def convert(directory):
         rgb_im.save(file + ".png", "PNG")
         
         
-directory = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/train/rgb/"
+directory = "C:/Users/UC/Desktop/half_sunrgb/train/rgb/"
 convert(directory)
-directory = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/rgb/"
+directory = "C:/Users/UC/Desktop/half_sunrgb/test/rgb/"
 convert(directory)
-directory = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/val/rgb/"
+directory = "C:/Users/UC/Desktop/half_sunrgb/val/rgb/"
 convert(directory)
 

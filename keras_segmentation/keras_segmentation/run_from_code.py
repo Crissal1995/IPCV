@@ -8,6 +8,7 @@ Created on Fri May  8 09:39:31 2020
 
 import json
 import os
+import glob
 from models.all_models import model_from_name
 from train import find_latest_checkpoint
 #from keras_segmentation.models.unet import vgg_unet
@@ -54,6 +55,7 @@ from keras_segmentation.pretrained import pspnet_50_ADE_20K
 from keras_segmentation.pretrained import resnet_pspnet_VOC12_v0_1
 from keras_segmentation.models.pspnet import pspnet_50
 from keras_segmentation.models.pspnet import resnet50_pspnet
+from keras_segmentation.models.segnet import mobilenet_segnet
 from keras import backend as K
 from keras import metrics
 from keras import losses
@@ -87,42 +89,51 @@ def masked_categorical_crossentropy(gt, pr):
 def jaccard_crossentropy(out, tar):
     return losses.categorical_crossentropy(out, tar) + jaccard_distance(out, tar)
 
-def dice_coef(y_true, y_pred, smooth=1):
-    """
-    Dice = (2*|X & Y|)/ (|X|+ |Y|)
-         =  2*sum(|A*B|)/(sum(A^2)+sum(B^2))
-    ref: https://arxiv.org/pdf/1606.04797v1.pdf
-    """
-    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
-    return (2. * intersection + smooth) / (K.sum(K.square(y_true),-1) + K.sum(K.square(y_pred),-1) + smooth)
 
-def dice_coef_loss(y_true, y_pred):
-    return 1-dice_coef(y_true, y_pred)
-
-def dice_crossentropy(out, tar):
-    return losses.categorical_crossentropy(out, tar) + dice_coef_loss(out, tar)
-
-pretrained_model = pspnet_50_ADE_20K()
+#pretrained_model = pspnet_50_ADE_20K()
 #pretrained_model = resnet_pspnet_VOC12_v0_1()
-model = pspnet_50( n_classes=38 ) # accuracy: 0.5348 10 epochs
+#model = pspnet_50_slim( n_classes=38 ) # accuracy: 0.5348 10 epochs
 #model = resnet50_pspnet( n_classes=38 ) # accuracy: 0.5154 - frequency_weighted_IU': 0.3473552042914965, 'mean_IU': 0.10207884596666351
 
-transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
+#transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
 
 
 trainingMode = True
-evaluate = False
+trainingFromInit = False
+evaluate = True
+
+if os.name == 'nt':
+    init = "C:/Users/UC/Desktop/"
+else:
+    init = "/Users/salvatorecapuozzo/Desktop/"
 
 if trainingMode:
     #model = fcn_32(n_classes=38 ,  input_height=224, input_width=320  )
     # model = vgg_unet(n_classes=38 ,  input_height=416, input_width=608  )
     #model = vgg_unet(n_classes=38 ,  input_height=416, input_width=608  )
     
-    opt = optimizers.Adam(learning_rate=0.005)
-    if os.name == 'nt':
-        init = "C:/Users/UC/Desktop/"
+    if trainingFromInit:
+        model = pspnet_50_slim( n_classes=38 ) # accuracy: 0.5348 10 epochs
+        opt = optimizers.Adam(learning_rate=0.003)
     else:
-        init = "/Users/salvatorecapuozzo/Desktop/"
+        checkpoints_path = init+"pspnet_50_slim_checkpoint_50/"
+        full_config_path = checkpoints_path+"_config.json"
+        assert (os.path.isfile(full_config_path)
+        #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
+                ), "Checkpoint not found."
+        model_config = json.loads(
+            open(full_config_path, "r").read())
+        latest_weights = find_latest_checkpoint(checkpoints_path)
+        assert (latest_weights is not None), "Weights not found."
+        assert (os.path.isfile(latest_weights)), "Weights not found."
+        #model = model_from_name[model_config['model_class']](
+        model = model_from_name[model_config['model_class']](
+            model_config['n_classes'], input_height=model_config['input_height'],
+            input_width=model_config['input_width'])
+        print("loaded weights ", latest_weights)
+        model.load_weights(latest_weights)
+        opt = optimizers.Adam(learning_rate=0.0001)
+    
         
     train_images =  init+"sunrgb/train/rgb/"
     train_annotations = init+"sunrgb/train/seg/"
@@ -144,19 +155,19 @@ if trainingMode:
         val_images = init+"sunrgb/val/rgb/",
         val_annotations = init+"sunrgb/val/seg/",
         checkpoints_path = init,
-        batch_size = 2,
+        batch_size = 7,
         steps_per_epoch = 512,
-        val_batch_size = 1,
+        val_batch_size = 8,
         n_classes = 38,
         validate = True,
         verify_dataset = False,
         optimizer_name = opt,
-        loss_type = dice_crossentropy,
+        loss_type = jaccard_crossentropy,
         metrics_used = ['accuracy', metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
-        do_augment = True,
+        do_augment = False,
         gen_use_multiprocessing = False,
         ignore_zero_class = False,
-        epochs = 1
+        epochs = 40
     )
     
     # print(model.summary())
@@ -165,60 +176,78 @@ if trainingMode:
     #         annotations_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/seg/"
     #     ))
 else:
-    #checkpoints_path = "C:/Users/UC/Desktop/image-segmentation-keras-master/sun_checkpoints_pspnet_4/"
-    checkpoints_path = "/Users/salvatorecapuozzo/Desktop/new_jce/"
-    #from models.all_models import model_from_name
-    #model_from_name["vgg_unet"] = unet.vgg_unet
-    full_config_path = checkpoints_path+"_config.json"
-    assert (os.path.isfile(full_config_path)
-    #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
-            ), "Checkpoint not found."
-    model_config = json.loads(
-        open(full_config_path, "r").read())
-    #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
-    latest_weights = find_latest_checkpoint(checkpoints_path)
-    #assert (os.path.isfile("./"+checkpoints_path+".4")
-            #), "Weights not found."
-    #latest_weights = checkpoints_path+".4"
-    assert (latest_weights is not None), "Weights not found."
-    assert (os.path.isfile(latest_weights)), "Weights not found."
-    #model = model_from_name[model_config['model_class']](
-    model = model_from_name[model_config['model_class']](
-        model_config['n_classes'], input_height=model_config['input_height'],
-        input_width=model_config['input_width'])
-    print("loaded weights ", latest_weights)
-    model.load_weights(latest_weights)
-    print(model.summary())
+    #sun_inp_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/rgb/"
+    #sun_ann_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/seg/"
+    sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
+    sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+        
+    chosen_img = "img_00027.png"
+        
+    checkpoints_path = init+"ipcv_checkpoints/"
+    all_checkpoint_folders = glob.glob(checkpoints_path + "*")
     
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(2,len(all_checkpoint_folders))
+    img = plt.imread(sun_inp_dir+chosen_img)
+    axes[0].set_title('Original', fontsize=8)
+    axes[0].imshow(img)
+    img2 = plt.imread(sun_ann_dir+chosen_img)
+    axes[1].set_title('Segmentation', fontsize=8)
+    axes[1].imshow(img2)
     
-    if checkpoints_path == "C:/Users/UC/Desktop/image-segmentation-keras-master/checkpoints/":
-        inp_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/dataset1/images_prepped_test/"
-        ann_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/dataset1/annotations_prepped_test/"
+    i = 2
+    for folder in all_checkpoint_folders:
+        #from models.all_models import model_from_name
+        #model_from_name["vgg_unet"] = unet.vgg_unet
+        full_config_path = folder+"\_config.json"
+        #print(full_config_path)
+        assert (os.path.isfile(full_config_path)
+        #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
+                ), "Checkpoint not found."
+        model_config = json.loads(
+            open(full_config_path, "r").read())
+        #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
+        latest_weights = find_latest_checkpoint(folder+"/")
+        #assert (os.path.isfile("./"+checkpoints_path+".4")
+                #), "Weights not found."
+        #latest_weights = checkpoints_path+".4"
+        assert (latest_weights is not None), "Weights not found."
+        assert (os.path.isfile(latest_weights)), "Weights not found."
+        #model = model_from_name[model_config['model_class']](
+        model = model_from_name[model_config['model_class']](
+            model_config['n_classes'], input_height=model_config['input_height'],
+            input_width=model_config['input_width'])
+        print("loaded weights ", latest_weights)
+        model.load_weights(latest_weights)
+        #print(model.summary())
         
         out = model.predict_segmentation(
-            inp=inp_dir+"0016E5_07965.png",
-            out_fname="C:/Users/UC/Desktop/image-segmentation-keras-master/tmp/out.png"
+            inp=sun_inp_dir+chosen_img,
+            out_fname="C:/Users/UC/Desktop/ipcv_out/"+model_config['model_class']+"_"+latest_weights[-2:]+"_"+chosen_img
         )
         
-        import matplotlib.pyplot as plt
-        plt.imshow(out)
+        
         
         # evaluating the model 
         if evaluate:
-            print(model.evaluate_segmentation( inp_images_dir=inp_dir  , annotations_dir=ann_dir ) )
+            evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+            print(evaluation)
+            axes[i].set_title(
+                model_config['model_class']+"_"+
+                latest_weights[-2:]+
+                "_("+str(round(100*evaluation['frequency_weighted_IU'])/100)+
+                " - "+str(round(100*evaluation['mean_IU'])/100)+")", fontsize=8)
+            axes[i].imshow(out)
+        else:
+            axes[i].set_title(model_config['model_class']+"_"+latest_weights[-2:], fontsize=8)
+            axes[i].imshow(out)
+            
+        i += 1
     
-    elif checkpoints_path == "/Users/salvatorecapuozzo/Desktop/new_jce/":
-        sun_inp_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/rgb/"
-        sun_ann_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/seg/"
-        
-        out = model.predict_segmentation(
-            inp=sun_inp_dir+"img_00005.jpg",
-            out_fname="/Users/salvatorecapuozzo/Desktop/sun_out_29_05.png"
-        )
-        
-        import matplotlib.pyplot as plt
-        plt.imshow(out)
-        
-        # evaluating the model
-        if evaluate:
-            print(model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) )
+    #mng = plt.get_current_fig_manager()
+    #mng.window.showMaximized()
+    plt.show()
+    fig.set_size_inches(14,10)
+    plt.savefig("C:/Users/UC/Desktop/ipcv_out/all_models.png")
+    
+    

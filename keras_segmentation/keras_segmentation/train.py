@@ -35,11 +35,12 @@ def jaccard_distance(y_true, y_pred, smooth=100):
 def find_latest_checkpoint(checkpoints_path, fail_safe=True):
 
     def get_epoch_number_from_path(path):
-        print(re.sub('\D', '',path))
+        #print(re.sub('\D', '',path))
         #print(path.replace(checkpoints_path, "").strip("."))
         return re.sub('\D', '',path)
 
     # Get all matching files
+    
     all_checkpoint_files = glob.glob(checkpoints_path + "cp.*")
     # Filter out entries where the epoc_number part is pure number
     all_checkpoint_files = list(filter(lambda f: get_epoch_number_from_path(f)
