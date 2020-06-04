@@ -127,14 +127,14 @@ def convertToSunRgb(model):
     x = model.layers[-1].output
     print(x)
     model.layers.pop()
-    channels_concat = x[:,:,:,0:1]
+    concat = x[:,:,:,0:1]
     for i in [4,6,8,9,11,13,15,16,19,20,23,24,25,28,29,31,34,36,37,38,42,44,45,46,48,51,56,58,63,66,68,71,82,87,90,93,100,116,131,142,144,145,146]:
         new_slice = x[:,:,:,i-1]
-        channels_concat.append(new_slice)
+        concat = Concatenate(axis=-1)(concat,new_slice)
       
-    del channels_concat[:,:,:,1]
+    del concat[:,:,:,1]
     #print(channels_concat)
-    concat = Concatenate(axis=-1)(channels_concat)
+    #concat = Concatenate(axis=-1)(channels_concat)
     x = model.layers[-1].output
     print(concat)
     x = concat(x)
