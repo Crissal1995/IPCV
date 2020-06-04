@@ -32,10 +32,15 @@ def convert(directory):
         rgb_im.save(file + ".png", "PNG")
         
         
-directory = "C:/Users/UC/Desktop/half_sunrgb/train/rgb/"
+if os.name == 'nt':
+    init = "C:/Users/UC/Desktop/"
+else:
+    init = "/Users/salvatorecapuozzo/Desktop/"
+    
+directory = init+"sunrgb/train/rgb/"
 convert(directory)
-directory = "C:/Users/UC/Desktop/half_sunrgb/test/rgb/"
+directory = init+"sunrgb/test/rgb/"
 convert(directory)
-directory = "C:/Users/UC/Desktop/half_sunrgb/val/rgb/"
+directory = init+"sunrgb/val/rgb/"
 convert(directory)
 

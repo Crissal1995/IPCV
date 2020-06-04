@@ -58,6 +58,7 @@ from keras_segmentation.models.pspnet import pspnet_50
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
 from keras.layers import Conv2D
+from keras.layers import Concatenate
 from keras import Input
 from keras_segmentation.models.segnet import mobilenet_segnet
 from keras import backend as K
@@ -102,6 +103,9 @@ def jaccard_crossentropy(out, tar):
 #transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
 
 def convertToSunRgb(model):
+    for layer in model.layers:
+        layer.trainable = False
+    
     model.trainable = False
 
     #inputs = Input(shape=(inp.shape[1],inp.shape[2],inp.shape[3]))
@@ -109,10 +113,11 @@ def convertToSunRgb(model):
     
     
     inp = model.input
+    print(inp.shape)
     model.layers.pop()
     model.layers.pop()
     model.layers.pop()
-    model.layers.pop()
+    #model.layers.pop()
     
     #x = Conv2D(150, (1, 1), strides=(1, 1), name="conv6", padding='same')(model.layers[-1].output)
     #x = Conv2D(37, (1, 1), strides=(1, 1), padding='same', name='conv6_sunrgb',
@@ -120,15 +125,29 @@ def convertToSunRgb(model):
     #print(x)
     #print(model.layers[-1].output)
     x = model.layers[-1].output
-    x = Conv2D(37, (1, 1), strides=(1, 1), padding='same', name='conv6_sunrgb', use_bias=False)(x)
-    x = Interp([inp.shape[1], inp.shape[2]])(x)
+    print(x)
+    model.layers.pop()
+    channels_concat = x[:,:,:,0:1]
+    for i in [4,6,8,9,11,13,15,16,19,20,23,24,25,28,29,31,34,36,37,38,42,44,45,46,48,51,56,58,63,66,68,71,82,87,90,93,100,116,131,142,144,145,146]:
+        new_slice = x[:,:,:,i-1]
+        channels_concat.append(new_slice)
+      
+    del channels_concat[:,:,:,1]
+    #print(channels_concat)
+    concat = Concatenate(axis=-1)(channels_concat)
+    x = model.layers[-1].output
+    print(concat)
+    x = concat(x)
+    print(x)
+    #x = Conv2D(37, (1, 1), strides=(1, 1), padding='same', name='conv6_sunrgb', use_bias=False)(x)
+    x = Interp([473, 473])(x)
     
     new_model = get_segmentation_model(inp,x)
     
     return new_model
 
 
-mode = 0
+mode = 2
 trainingFromInit = True
 evaluate = False
 
@@ -146,7 +165,7 @@ if mode == 0:
         #model = pspnet_50_slim( n_classes=38 ) # accuracy: 0.5348 10 epochs
         model = pspnet_50_ADE_20K()
         model = convertToSunRgb(model)
-        print(model.summary())
+        #print(model.summary())
         
         opt = optimizers.Adam(learning_rate=0.0001)
     else:
@@ -189,9 +208,9 @@ if mode == 0:
         val_images = init+"sunrgb/val/rgb/",
         val_annotations = init+"sunrgb/val/seg/",
         checkpoints_path = init,
-        batch_size = 12,
+        batch_size = 2,
         steps_per_epoch = 512,
-        val_batch_size = 12,
+        val_batch_size = 2,
         n_classes = 37,
         validate = True,
         verify_dataset = False,
@@ -257,7 +276,7 @@ elif mode == 1:
         
         out = model.predict_segmentation(
             inp=sun_inp_dir+chosen_img,
-            out_fname="C:/Users/UC/Desktop/ipcv_out/"+folder+"_"+latest_weights[-2:]+"_"+chosen_img
+            out_fname=init+"/ipcv_out/"+folder+"_"+latest_weights[-2:]+"_"+chosen_img
         )
         
         # evaluating the model 
@@ -280,7 +299,7 @@ elif mode == 1:
     #mng.window.showMaximized()
     plt.show()
     fig.set_size_inches(14,10)
-    plt.savefig("C:/Users/UC/Desktop/ipcv_out/all_models.png")
+    plt.savefig(init+"/ipcv_out/all_models.png")
 elif mode == 2:
     #pretrained_model = pspnet_50_ADE_20K()
     #model = pspnet_50( n_classes=38 ) # accuracy: 0.5348 10 epochs
@@ -291,8 +310,8 @@ elif mode == 2:
     model = convertToSunRgb(model)
     print(model.summary())
 
-    sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
-    sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+    sun_inp_dir = init+"half_sunrgb/test/rgb/"
+    sun_ann_dir = init+"half_sunrgb/test/seg/"
         
     chosen_img = "img_00027.png"
         
@@ -312,7 +331,7 @@ elif mode == 2:
     
     out = model.predict_segmentation(
         inp=sun_inp_dir+chosen_img,
-        out_fname="C:/Users/UC/Desktop/ipcv_out/pspne5_50_ade20k_"+chosen_img
+        out_fname=init+"/ipcv_out/pspne5_50_ade20k_"+chosen_img
     )
     
     # evaluating the model 
@@ -332,5 +351,9 @@ elif mode == 2:
     #mng.window.showMaximized()
     plt.show()
     fig.set_size_inches(14,10)
-    plt.savefig("C:/Users/UC/Desktop/ipcv_out/ade20k.png")
+    plt.savefig(init+"/ipcv_out/ade20k.png")
     
+elif mode == 3:
+    model = pspnet_50_ADE_20K()
+    model = convertToSunRgb(model)
+    print(model.summary())

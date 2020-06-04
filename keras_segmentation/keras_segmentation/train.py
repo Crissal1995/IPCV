@@ -17,6 +17,7 @@ from keras import backend as K
 from time import time
 import matplotlib.pyplot as plt
 from keras.callbacks import TensorBoard
+
 #from keras import metrics
 # import tensorflow as tf
 
