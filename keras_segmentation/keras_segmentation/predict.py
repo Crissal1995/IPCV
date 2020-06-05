@@ -64,6 +64,20 @@ def get_colored_segmentation_image(seg_arr, n_classes, colors=class_colors):
 
     return seg_img
 
+def get_bw_segmentation_image(seg_arr, n_classes, colors=class_colors):
+    output_height = seg_arr.shape[0]
+    output_width = seg_arr.shape[1]
+
+    seg_img = np.zeros((output_height, output_width, 3))
+
+    for c in range(n_classes):
+        seg_arr_c = seg_arr[:, :] == c
+        seg_img[:, :, 0] += ((seg_arr_c)*c).astype('uint8')
+        seg_img[:, :, 1] += ((seg_arr_c)*c).astype('uint8')
+        seg_img[:, :, 2] += ((seg_arr_c)*c).astype('uint8')
+
+    return seg_img
+
 
 def get_legends(class_names, colors=class_colors):
 
@@ -109,12 +123,16 @@ def concat_lenends(seg_img, legend_img):
 def visualize_segmentation(seg_arr, inp_img=None, n_classes=None,
                            colors=class_colors, class_names=None,
                            overlay_img=False, show_legends=False,
-                           prediction_width=None, prediction_height=None):
+                           prediction_width=None, prediction_height=None,
+                           grayscale=False):
 
     if n_classes is None:
         n_classes = np.max(seg_arr)
-
-    seg_img = get_colored_segmentation_image(seg_arr, n_classes, colors=colors)
+        
+    if grayscale:
+        seg_img = get_bw_segmentation_image(seg_arr, n_classes, colors=colors)
+    else:
+        seg_img = get_colored_segmentation_image(seg_arr, n_classes, colors=colors)
 
     if inp_img is not None:
         orininal_h = inp_img.shape[0]
@@ -168,15 +186,25 @@ def predict(model=None, inp=None, out_fname=None,
     pr = model.predict(np.array([x]))[0]
     pr = pr.reshape((output_height,  output_width, n_classes)).argmax(axis=2)
 
+    seg_img_gray = visualize_segmentation(pr, inp, n_classes=n_classes,
+                                     colors=colors, overlay_img=overlay_img,
+                                     show_legends=show_legends,
+                                     class_names=class_names,
+                                     prediction_width=prediction_width,
+                                     prediction_height=prediction_height,
+                                     grayscale=True)
+    
     seg_img = visualize_segmentation(pr, inp, n_classes=n_classes,
                                      colors=colors, overlay_img=overlay_img,
                                      show_legends=show_legends,
                                      class_names=class_names,
                                      prediction_width=prediction_width,
-                                     prediction_height=prediction_height)
+                                     prediction_height=prediction_height,
+                                     grayscale=False)
 
     if out_fname is not None:
         cv2.imwrite(out_fname, seg_img)
+        cv2.imwrite(out_fname[:-4]+'_gray.png', seg_img_gray)
 
     return pr
 
@@ -291,10 +319,10 @@ def evaluate(model=None, inp_images=None, annotations=None,
     assert type(inp_images) is list
     assert type(annotations) is list
 
-    tp = np.zeros(model.n_classes)
-    fp = np.zeros(model.n_classes)
-    fn = np.zeros(model.n_classes)
-    n_pixels = np.zeros(model.n_classes)
+    tp = np.zeros(model.n_classes-1)
+    fp = np.zeros(model.n_classes-1)
+    fn = np.zeros(model.n_classes-1)
+    n_pixels = np.zeros(model.n_classes-1)
 
     for inp, ann in tqdm(zip(inp_images, annotations)):
         pr = predict(model, inp)
@@ -306,11 +334,13 @@ def evaluate(model=None, inp_images=None, annotations=None,
         gt = gt.flatten()
 
         for cl_i in range(model.n_classes):
-
-            tp[cl_i] += np.sum((pr == cl_i) * (gt == cl_i))
-            fp[cl_i] += np.sum((pr == cl_i) * ((gt != cl_i)))
-            fn[cl_i] += np.sum((pr != cl_i) * ((gt == cl_i)))
-            n_pixels[cl_i] += np.sum(gt == cl_i)
+            # Ignoring zero class (ambiguous)
+            if cl_i > 0:
+                i = cl_i - 1
+                tp[i] += np.sum((pr == cl_i) * (gt == cl_i))
+                fp[i] += np.sum((pr == cl_i) * ((gt != cl_i)))
+                fn[i] += np.sum((pr != cl_i) * ((gt == cl_i)))
+                n_pixels[i] += np.sum(gt == cl_i)
 
     cl_wise_score = tp / (tp + fp + fn + 0.000000000001)
     n_pixels_norm = n_pixels / np.sum(n_pixels)

@@ -58,13 +58,26 @@ from keras_segmentation.models.pspnet import pspnet_50
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
 from keras.layers import Conv2D
+from keras.layers import Dense
 from keras.layers import Concatenate
+from keras.layers import Layer
+from keras.layers import Input
+from keras.layers import Lambda
+from keras.layers import InputLayer
+from keras.models import Model
+from keras.models import Sequential
 from keras import Input
 from keras_segmentation.models.segnet import mobilenet_segnet
 from keras import backend as K
 from keras import metrics
 from keras import losses
 from keras import optimizers
+from kerassurgeon import identify
+from kerassurgeon.operations import delete_channels,delete_layer
+import tensorflow as tf
+#import tensorflow_model_optimization as tfmot
+from tensorflow_model_optimization.sparsity.keras import PolynomialDecay
+from tensorflow_model_optimization.sparsity.keras import prune_low_magnitude
 from keras_segmentation.data_utils.data_loader import image_segmentation_generator, \
         verify_segmentation_dataset
 
@@ -102,11 +115,24 @@ def jaccard_crossentropy(out, tar):
 
 #transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
 
-def convertToSunRgb(model):
-    for layer in model.layers:
-        layer.trainable = False
+sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
+total_range = range(0,151)
+sub_range = [item for item in total_range if item not in sunrgb_class_range]
+
     
-    model.trainable = False
+def sunrgbize(x):
+    concat = x[:,:,:,127,None] #Simulates the empty class
+    for i in sunrgb_class_range:
+        new_slice = x[:,:,:,i-1,None]
+        concat = K.concatenate([concat,new_slice], axis=-1)
+    
+    return concat
+
+def convertToSunRgb(model,distructive=False):
+    # for layer in model.layers:
+    #     layer.trainable = False
+    
+    # model.trainable = False
 
     #inputs = Input(shape=(inp.shape[1],inp.shape[2],inp.shape[3]))
     #x = model(inputs)
@@ -117,39 +143,28 @@ def convertToSunRgb(model):
     model.layers.pop()
     model.layers.pop()
     model.layers.pop()
-    #model.layers.pop()
+
     
-    #x = Conv2D(150, (1, 1), strides=(1, 1), name="conv6", padding='same')(model.layers[-1].output)
-    #x = Conv2D(37, (1, 1), strides=(1, 1), padding='same', name='conv6_sunrgb',
-                  #use_bias=False)(x)
-    #print(x)
-    #print(model.layers[-1].output)
     x = model.layers[-1].output
     print(x)
-    model.layers.pop()
-    concat = x[:,:,:,0:1]
-    for i in [4,6,8,9,11,13,15,16,19,20,23,24,25,28,29,31,34,36,37,38,42,44,45,46,48,51,56,58,63,66,68,71,82,87,90,93,100,116,131,142,144,145,146]:
-        new_slice = x[:,:,:,i-1]
-        concat = Concatenate(axis=-1)(concat,new_slice)
-      
-    del concat[:,:,:,1]
-    #print(channels_concat)
-    #concat = Concatenate(axis=-1)(channels_concat)
-    x = model.layers[-1].output
-    print(concat)
-    x = concat(x)
-    print(x)
-    #x = Conv2D(37, (1, 1), strides=(1, 1), padding='same', name='conv6_sunrgb', use_bias=False)(x)
-    x = Interp([473, 473])(x)
     
-    new_model = get_segmentation_model(inp,x)
+    if distructive:
+        # Not working
+        new_model = delete_channels(model,x,sub_range)
+    else:
+        x = Lambda(sunrgbize, name='class_filter')(x)
+        
+        x = Interp([473, 473])(x)
+    
+        new_model = get_segmentation_model(inp,x)
+    
     
     return new_model
 
 
-mode = 2
+mode = 3
 trainingFromInit = True
-evaluate = False
+evaluate = True
 
 if os.name == 'nt':
     init = "C:/Users/UC/Desktop/"
@@ -166,6 +181,8 @@ if mode == 0:
         model = pspnet_50_ADE_20K()
         model = convertToSunRgb(model)
         #print(model.summary())
+        prun_schedule = PolynomialDecay(initial_sparsity=0.0, final_sparsity=0.5,begin_step=2000,end_step=4000)
+        model = prune_low_magnitude(model, pruning_schedule=prun_schedule)
         
         opt = optimizers.Adam(learning_rate=0.0001)
     else:
@@ -211,7 +228,7 @@ if mode == 0:
         batch_size = 2,
         steps_per_epoch = 512,
         val_batch_size = 2,
-        n_classes = 37,
+        n_classes = 38,
         validate = True,
         verify_dataset = False,
         optimizer_name = opt,
@@ -220,7 +237,7 @@ if mode == 0:
         do_augment = False,
         gen_use_multiprocessing = False,
         ignore_zero_class = False,
-        epochs = 20
+        epochs = 25
     )
     
     # print(model.summary())
@@ -273,18 +290,19 @@ elif mode == 1:
         print("loaded weights ", latest_weights)
         model.load_weights(latest_weights)
         #print(model.summary())
-        
+        folder = os.path.basename(folder)
+
         out = model.predict_segmentation(
             inp=sun_inp_dir+chosen_img,
             out_fname=init+"/ipcv_out/"+folder+"_"+latest_weights[-2:]+"_"+chosen_img
         )
         
         # evaluating the model 
-        if evaluate and folder == 'pspnet_50_slim_new':
+        if evaluate:
             evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
             print(evaluation)
             axes[i].set_title(
-                model_config['model_class']+"_"+
+                folder+"_"+
                 latest_weights[-2:]+
                 "_("+str(round(100*evaluation['frequency_weighted_IU'])/100)+
                 " - "+str(round(100*evaluation['mean_IU'])/100)+")", fontsize=6)
@@ -307,8 +325,9 @@ elif mode == 2:
     #transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
     
     model = pspnet_50_ADE_20K()
+    #print(model.summary())
     model = convertToSunRgb(model)
-    print(model.summary())
+    #print(model.summary())
 
     sun_inp_dir = init+"half_sunrgb/test/rgb/"
     sun_ann_dir = init+"half_sunrgb/test/seg/"
@@ -355,5 +374,9 @@ elif mode == 2:
     
 elif mode == 3:
     model = pspnet_50_ADE_20K()
-    model = convertToSunRgb(model)
-    print(model.summary())
+    model = convertToSunRgb(model,distructive=False)
+    sun_inp_dir = init+"half_sunrgb/test/rgb/"
+    sun_ann_dir = init+"half_sunrgb/test/seg/"
+    evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+    print(evaluation)
+    
