@@ -200,11 +200,14 @@ def _is_valid_file(file):
 
 def info():
     def _walk(path):
+        print('Inside', path, ':')
         for root, dirs, files in os.walk(path):
             if root.startswith('.'):
                 continue
             if not files:
                 continue
-            print('DIR {} : FILES {}'.format(root, len(files)))
+            print(' | DIR {} : FILES {}'.format(root, len(files)))
+
     _walk(DATA_PATH)
     _walk(DATASET_PATH)
+
