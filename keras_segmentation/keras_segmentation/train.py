@@ -17,6 +17,7 @@ from keras import backend as K
 from time import time
 import matplotlib.pyplot as plt
 from keras.callbacks import TensorBoard
+from keras.callbacks import CSVLogger
 
 #from keras import metrics
 # import tensorflow as tf
@@ -71,8 +72,12 @@ def masked_categorical_crossentropy(gt, pr):
 class CheckpointsCallback(Callback):
     def __init__(self, checkpoints_path):
         self.checkpoints_path = checkpoints_path
+        
+    def on_train_begin(self, logs={}):
+        self.losses = []
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch, logs={}):
+        self.losses.append(logs.get('loss'))
         if self.checkpoints_path is not None and (epoch+1)%5 == 0:
             self.model.save_weights(self.checkpoints_path + "cp." + str(epoch))
             print("saved ", self.checkpoints_path + "cp." + str(epoch))
@@ -194,7 +199,8 @@ def train(model,
             n_classes, input_height, input_width, output_height, output_width)
 
     callbacks = [
-        CheckpointsCallback(checkpoints_path)
+        CheckpointsCallback(checkpoints_path),
+        CSVLogger(checkpoints_path+model.model_name+'_training.csv')
     ]
 
     if not validate:
