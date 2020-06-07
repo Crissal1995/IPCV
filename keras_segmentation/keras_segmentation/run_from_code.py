@@ -15,41 +15,6 @@ from train import find_latest_checkpoint
 from keras_segmentation.models.fcn import fcn_32
 from keras_segmentation.models.unet import vgg_unet
 
-
-# from .data_utils.data_loader import get_image_array, get_segmentation_array,\
-#     DATA_LOADER_SEED, class_colors, get_pairs_from_paths
-# from .models.config import IMAGE_ORDERING
-
-
-
-
-# def find_latest_checkpoint(checkpoints_path, fail_safe=True):
-
-#     def get_epoch_number_from_path(path):
-#         print(re.sub('\D', '',path))
-#         #print(path.replace(checkpoints_path, "").strip("."))
-#         return re.sub('\D', '',path)
-
-#     # Get all matching files
-#     all_checkpoint_files = glob.glob(checkpoints_path + ".*")
-#     # Filter out entries where the epoc_number part is pure number
-#     all_checkpoint_files = list(filter(lambda f: get_epoch_number_from_path(f)
-#                                        .isdigit(), all_checkpoint_files))
-#     print(all_checkpoint_files)
-#     if not len(all_checkpoint_files):
-#         # The glob list is empty, don't have a checkpoints_path
-#         if not fail_safe:
-#             raise ValueError("Checkpoint path {0} invalid"
-#                              .format(checkpoints_path))
-#         else:
-#             return None
-
-#     # Find the checkpoint file with the maximum epoch
-#     latest_epoch_checkpoint = max(all_checkpoint_files,
-#                                   key=lambda f:
-#                                   int(get_epoch_number_from_path(f)))
-#     return latest_epoch_checkpoint
-
 from keras_segmentation.models.model_utils import transfer_weights
 from keras_segmentation.models.model_utils import get_segmentation_model
 from keras_segmentation.pretrained import pspnet_50_ADE_20K
@@ -57,16 +22,8 @@ from keras_segmentation.pretrained import resnet_pspnet_VOC12_v0_1
 from keras_segmentation.models.pspnet import pspnet_50
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
-from keras.layers import Conv2D
-from keras.layers import Dense
-from keras.layers import Concatenate
-from keras.layers import Layer
-from keras.layers import Input
-from keras.layers import Lambda
-from keras.layers import InputLayer
-from keras.models import Model
-from keras.models import Sequential
-from keras import Input
+from keras_segmentation.train import prune
+from keras.layers import Lambda, Input
 from keras_segmentation.models.segnet import mobilenet_segnet
 from keras import backend as K
 from keras import metrics
@@ -115,12 +72,14 @@ def jaccard_crossentropy(out, tar):
 
 #transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
 
-sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
-total_range = range(0,151)
-sub_range = [item for item in total_range if item not in sunrgb_class_range]
+
 
     
 def sunrgbize(x):
+    sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
+    total_range = range(0,151)
+    sub_range = [item for item in total_range if item not in sunrgb_class_range]
+
     concat = x[:,:,:,127,None] #Simulates the empty class
     for i in sunrgb_class_range:
         new_slice = x[:,:,:,i-1,None]
@@ -129,6 +88,9 @@ def sunrgbize(x):
     return concat
 
 def convertToSunRgb(model,distructive=False):
+    sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
+    total_range = range(0,151)
+    sub_range = [item for item in total_range if item not in sunrgb_class_range]
     # for layer in model.layers:
     #     layer.trainable = False
     
@@ -139,7 +101,7 @@ def convertToSunRgb(model,distructive=False):
     
     
     inp = model.input
-    print(inp.shape)
+    
     model.layers.pop()
     model.layers.pop()
     model.layers.pop()
@@ -197,12 +159,13 @@ if mode == 0:
         assert (latest_weights is not None), "Weights not found."
         assert (os.path.isfile(latest_weights)), "Weights not found."
         #model = model_from_name[model_config['model_class']](
+        
         model = model_from_name[model_config['model_class']](
             model_config['n_classes'], input_height=model_config['input_height'],
             input_width=model_config['input_width'])
         print("loaded weights ", latest_weights)
         model.load_weights(latest_weights)
-        opt = optimizers.Adam(learning_rate=0.0001)
+        opt = optimizers.Adam(learning_rate=0.00001)
     
         
     train_images =  init+"sunrgb/train/rgb/"
@@ -232,7 +195,7 @@ if mode == 0:
         validate = True,
         verify_dataset = False,
         optimizer_name = opt,
-        loss_type = losses.categorical_crossentropy,
+        loss_type = jaccard_crossentropy,
         metrics_used = ['accuracy', metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
         do_augment = False,
         gen_use_multiprocessing = False,
@@ -284,9 +247,14 @@ elif mode == 1:
         assert (latest_weights is not None), "Weights not found."
         assert (os.path.isfile(latest_weights)), "Weights not found."
         #model = model_from_name[model_config['model_class']](
-        model = model_from_name[model_config['model_class']](
-            model_config['n_classes'], input_height=model_config['input_height'],
-            input_width=model_config['input_width'])
+        
+        if model_config['model_class'] == "":
+            model = pspnet_50_ADE_20K()
+            model = convertToSunRgb(model)
+        else:
+            model = model_from_name[model_config['model_class']](
+                model_config['n_classes'], input_height=model_config['input_height'],
+                input_width=model_config['input_width'])
         print("loaded weights ", latest_weights)
         model.load_weights(latest_weights)
         #print(model.summary())
@@ -373,10 +341,121 @@ elif mode == 2:
     plt.savefig(init+"/ipcv_out/ade20k.png")
     
 elif mode == 3:
-    model = pspnet_50_ADE_20K()
-    model = convertToSunRgb(model,distructive=False)
+    print_models = False
+    model = pspnet_50_slim(n_classes = 38)
+    #print(model.summary())
+    
+    if print_models:
+        tf.keras.utils.plot_model(
+            model,
+            to_file=init+"pspnet_50_slim.png",
+            show_shapes=True,
+            show_layer_names=True,
+            rankdir="TB",
+            expand_nested=False,
+            dpi=96,
+        )
+    
+    model1 = pspnet_50_ADE_20K(height=256,width=256)
+    model1 = convertToSunRgb(model1,distructive=False)
+    print(model1.summary())
+    
+    if print_models:
+        tf.keras.utils.plot_model(
+            model1,
+            to_file=init+"pspnet_50_ade_20k.png",
+            show_shapes=True,
+            show_layer_names=True,
+            rankdir="TB",
+            expand_nested=False,
+            dpi=96,
+        )
+    
+    model2 = pspnet_50_ADE_20K()
+    model2 = convertToSunRgb(model2,distructive=False)
+    
+    checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_trained/"
+    full_config_path = checkpoints_path+"\_config.json"
+    #print(full_config_path)
+    assert (os.path.isfile(full_config_path)
+    #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
+            ), "Checkpoint not found."
+    model_config = json.loads(
+        open(full_config_path, "r").read())
+    #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
+    latest_weights = find_latest_checkpoint(checkpoints_path+"/")
+    #assert (os.path.isfile("./"+checkpoints_path+".4")
+            #), "Weights not found."
+    #latest_weights = checkpoints_path+".4"
+    assert (latest_weights is not None), "Weights not found."
+    assert (os.path.isfile(latest_weights)), "Weights not found."
+    #model = model_from_name[model_config['model_class']](
+
+    print("loaded weights ", latest_weights)
+    model2.load_weights(latest_weights)
+    
+    opt = optimizers.Adam(learning_rate=0.00001)
+    train_images =  init+"sunrgb/train/rgb/"
+    train_annotations = init+"sunrgb/train/seg/"
+    val_images =  init+"sunrgb/val/rgb/",
+    val_annotations = init+"sunrgb/val/seg/",
+    train_images_2 =  init+"half_sunrgb/train/rgb/"
+    train_annotations_2 = init+"half_sunrgb/train/seg/"
+    val_images_2 =  init+"half_sunrgb/val/rgb/",
+    val_annotations_2 = init+"half_sunrgb/val/seg/",
+    n_classes = model.n_classes
+    input_height = model.input_height
+    input_width = model.input_width
+    output_height = model.output_height
+    output_width = model.output_width
+
+    model = prune(model2)
+    #print(model.summary())
+    # model2.train(
+    #     train_images =  train_images,
+    #     train_annotations = train_annotations,
+    #     val_images = init+"sunrgb/val/rgb/",
+    #     val_annotations = init+"sunrgb/val/seg/",
+    #     checkpoints_path = init,
+    #     batch_size = 2,
+    #     steps_per_epoch = 512,
+    #     val_batch_size = 2,
+    #     n_classes = 38,
+    #     validate = True,
+    #     verify_dataset = False,
+    #     optimizer_name = opt,
+    #     loss_type = jaccard_crossentropy,
+    #     metrics_used = ['accuracy', metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
+    #     do_augment = False,
+    #     gen_use_multiprocessing = False,
+    #     ignore_zero_class = False,
+    #     epochs = 0
+    # )
+    
+    
+    # layers1 = model1.layers
+    # layers2 = model2.layers
+    
+    # equal_count = 0
+    # total = 0
+
+    # bar = zip(layers1, layers2)
+    
+    # for l, ll in bar:
+    #     for w, ww in zip(list(l.weights),list(ll.weights)):
+    #         if not any([w.shape != ww.shape]):
+    #             for e, ee in zip(w.numpy().flatten(),ww.numpy().flatten()):
+    #                 total += 1
+    #                 if abs(e-ee) < 10e-9:
+    #                     equal_count += 1
+            
+    
+        
+    
+    # print(equal_count)
+    # print(total)
     sun_inp_dir = init+"half_sunrgb/test/rgb/"
     sun_ann_dir = init+"half_sunrgb/test/seg/"
-    evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
-    print(evaluation)
+    #evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+    #print(evaluation)
     
