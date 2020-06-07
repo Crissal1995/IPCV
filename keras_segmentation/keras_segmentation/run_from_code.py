@@ -19,11 +19,12 @@ from keras_segmentation.models.model_utils import transfer_weights
 from keras_segmentation.models.model_utils import get_segmentation_model
 from keras_segmentation.pretrained import pspnet_50_ADE_20K
 from keras_segmentation.pretrained import resnet_pspnet_VOC12_v0_1
-from keras_segmentation.models.pspnet import pspnet_50
+from keras_segmentation.models.pspnet import pspnet_50, pspnet_50_sunrgb
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
 from keras_segmentation.train import prune
 from keras.layers import Lambda, Input
+from keras.utils import get_file
 from keras_segmentation.models.segnet import mobilenet_segnet
 from keras import backend as K
 from keras import metrics
@@ -87,41 +88,50 @@ def sunrgbize(x):
     
     return concat
 
-def convertToSunRgb(model,distructive=False):
-    sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
-    total_range = range(0,151)
-    sub_range = [item for item in total_range if item not in sunrgb_class_range]
-    # for layer in model.layers:
-    #     layer.trainable = False
+# def convertToSunRgb(model,distructive=False):
+#     sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
+#     total_range = range(0,151)
+#     sub_range = [item for item in total_range if item not in sunrgb_class_range]
+#     # for layer in model.layers:
+#     #     layer.trainable = False
     
-    # model.trainable = False
+#     # model.trainable = False
 
-    #inputs = Input(shape=(inp.shape[1],inp.shape[2],inp.shape[3]))
-    #x = model(inputs)
+#     #inputs = Input(shape=(inp.shape[1],inp.shape[2],inp.shape[3]))
+#     #x = model(inputs)
     
     
-    inp = model.input
+#     inp = model.input
     
-    model.layers.pop()
-    model.layers.pop()
-    model.layers.pop()
+#     model.layers.pop()
+#     model.layers.pop()
+#     model.layers.pop()
 
     
-    x = model.layers[-1].output
-    print(x)
+#     x = model.layers[-1].output
+#     print(x)
     
-    if distructive:
-        # Not working
-        new_model = delete_channels(model,x,sub_range)
-    else:
-        x = Lambda(sunrgbize, name='class_filter')(x)
+#     if distructive:
+#         # Not working
+#         new_model = delete_channels(model,x,sub_range)
+#     else:
+#         x = Lambda(sunrgbize, name='class_filter')(x)
         
-        x = Interp([473, 473])(x)
+#         x = Interp([473, 473])(x)
+        
+#         new_model = get_segmentation_model(inp,x)
     
-        new_model = get_segmentation_model(inp,x)
+#     return new_model
+
+def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
+
+    model_url = "https://www.dropbox.com/s/" \
+                "0uxn14y26jcui4v/pspnet50_ade20k.h5?dl=1"
+    latest_weights = get_file("pspnet50_ade20k.h5", model_url)
     
-    
-    return new_model
+    model = pspnet_50_sunrgb(height=height,width=width)
+    model.load_weights(latest_weights)
+    return model
 
 
 mode = 3
@@ -140,8 +150,8 @@ if mode == 0:
     
     if trainingFromInit:
         #model = pspnet_50_slim( n_classes=38 ) # accuracy: 0.5348 10 epochs
-        model = pspnet_50_ADE_20K()
-        model = convertToSunRgb(model)
+        model = pspnet_50_ADE_20K_SUNRGB()
+        #model = convertToSunRgb(model)
         #print(model.summary())
         prun_schedule = PolynomialDecay(initial_sparsity=0.0, final_sparsity=0.5,begin_step=2000,end_step=4000)
         model = prune_low_magnitude(model, pruning_schedule=prun_schedule)
@@ -249,8 +259,8 @@ elif mode == 1:
         #model = model_from_name[model_config['model_class']](
         
         if model_config['model_class'] == "":
-            model = pspnet_50_ADE_20K()
-            model = convertToSunRgb(model)
+            model = pspnet_50_ADE_20K_SUNRGB()
+            #model = convertToSunRgb(model)
         else:
             model = model_from_name[model_config['model_class']](
                 model_config['n_classes'], input_height=model_config['input_height'],
@@ -292,9 +302,9 @@ elif mode == 2:
     
     #transfer_weights( pretrained_model , model  ) # transfer weights from pre-trained model to your model
     
-    model = pspnet_50_ADE_20K()
+    model = pspnet_50_ADE_20K_SUNRGB()
     #print(model.summary())
-    model = convertToSunRgb(model)
+    #model = convertToSunRgb(model)
     #print(model.summary())
 
     sun_inp_dir = init+"half_sunrgb/test/rgb/"
@@ -343,7 +353,7 @@ elif mode == 2:
 elif mode == 3:
     print_models = False
     model = pspnet_50_slim(n_classes = 38)
-    #print(model.summary())
+    print(model.summary())
     
     if print_models:
         tf.keras.utils.plot_model(
@@ -356,14 +366,20 @@ elif mode == 3:
             dpi=96,
         )
     
-    model1 = pspnet_50_ADE_20K(height=256,width=256)
-    model1 = convertToSunRgb(model1,distructive=False)
+    model1 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
+    #model1 = convertToSunRgb(model1,distructive=False)
     print(model1.summary())
+    
+    sun_inp_dir = init+"half_sunrgb/test/rgb/"
+    sun_ann_dir = init+"half_sunrgb/test/seg/"
+    
+    # evaluation1 = model1.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+    # print(evaluation1)
     
     if print_models:
         tf.keras.utils.plot_model(
             model1,
-            to_file=init+"pspnet_50_ade_20k.png",
+            to_file=init+"pspnet_50_ade_20k_resized.png",
             show_shapes=True,
             show_layer_names=True,
             rankdir="TB",
@@ -371,8 +387,8 @@ elif mode == 3:
             dpi=96,
         )
     
-    model2 = pspnet_50_ADE_20K()
-    model2 = convertToSunRgb(model2,distructive=False)
+    model2 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
+    #model2 = convertToSunRgb(model2,distructive=False)
     
     checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_trained/"
     full_config_path = checkpoints_path+"\_config.json"
@@ -394,22 +410,25 @@ elif mode == 3:
     print("loaded weights ", latest_weights)
     model2.load_weights(latest_weights)
     
-    opt = optimizers.Adam(learning_rate=0.00001)
-    train_images =  init+"sunrgb/train/rgb/"
-    train_annotations = init+"sunrgb/train/seg/"
-    val_images =  init+"sunrgb/val/rgb/",
-    val_annotations = init+"sunrgb/val/seg/",
-    train_images_2 =  init+"half_sunrgb/train/rgb/"
-    train_annotations_2 = init+"half_sunrgb/train/seg/"
-    val_images_2 =  init+"half_sunrgb/val/rgb/",
-    val_annotations_2 = init+"half_sunrgb/val/seg/",
-    n_classes = model.n_classes
-    input_height = model.input_height
-    input_width = model.input_width
-    output_height = model.output_height
-    output_width = model.output_width
+    # evaluation2 = model2.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+    # print(evaluation2)
+    
+    # opt = optimizers.Adam(learning_rate=0.00001)
+    # train_images =  init+"sunrgb/train/rgb/"
+    # train_annotations = init+"sunrgb/train/seg/"
+    # val_images =  init+"sunrgb/val/rgb/",
+    # val_annotations = init+"sunrgb/val/seg/",
+    # train_images_2 =  init+"half_sunrgb/train/rgb/"
+    # train_annotations_2 = init+"half_sunrgb/train/seg/"
+    # val_images_2 =  init+"half_sunrgb/val/rgb/",
+    # val_annotations_2 = init+"half_sunrgb/val/seg/",
+    # n_classes = model.n_classes
+    # input_height = model.input_height
+    # input_width = model.input_width
+    # output_height = model.output_height
+    # output_width = model.output_width
 
-    model = prune(model2)
+    # model = prune(model2)
     #print(model.summary())
     # model2.train(
     #     train_images =  train_images,

@@ -5,9 +5,10 @@ from sys import exit
 from keras import layers
 from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
 from keras.layers import BatchNormalization, Activation,\
-    Input, Dropout, ZeroPadding2D
+    Input, Dropout, ZeroPadding2D, Lambda
 from keras.layers.merge import Concatenate, Add
 import tensorflow as tf
+from keras import backend as K
 
 from .config import IMAGE_ORDERING
 from .model_utils import get_segmentation_model
@@ -15,6 +16,18 @@ from .model_utils import get_segmentation_model
 
 learning_rate = 1e-3  # Layer specific learning rate
 # Weight decay not implemented
+
+def sunrgbize(x):
+    sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
+    total_range = range(0,151)
+    sub_range = [item for item in total_range if item not in sunrgb_class_range]
+
+    concat = x[:,:,:,127,None] #Simulates the empty class
+    for i in sunrgb_class_range:
+        new_slice = x[:,:,:,i-1,None]
+        concat = K.concatenate([concat,new_slice], axis=-1)
+    
+    return concat
 
 
 def BN(name=""):
@@ -287,6 +300,34 @@ def _build_pspnet(nb_classes, resnet_layers, input_shape,
     # x = Lambda(Interp, arguments={'shape': (
     #    input_shape[0], input_shape[1])})(x)
     x = Interp([input_shape[0], input_shape[1]])(x)
+
+    model = get_segmentation_model(inp, x)
+
+    return model
+
+def _build_sunrgb_pspnet(nb_classes, resnet_layers, input_shape,
+                  activation='softmax'):
+
+    assert IMAGE_ORDERING == 'channels_last'
+
+    inp = Input((input_shape[0], input_shape[1], 3))
+
+    res = ResNet(inp, layers=resnet_layers)
+
+    psp = build_pyramid_pooling_module(res, input_shape)
+
+    x = Conv2D(512, (3, 3), strides=(1, 1), padding="same", name="conv5_4",
+               use_bias=False)(psp)
+    x = BN(name="conv5_4_bn")(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.1)(x)
+
+    x = Conv2D(nb_classes, (1, 1), strides=(1, 1), name="conv6")(x)
+    # x = Lambda(Interp, arguments={'shape': (
+    #    input_shape[0], input_shape[1])})(x)
+    x = Lambda(sunrgbize, name='class_filter')(x)
+    #x = Interp([input_shape[0], input_shape[1]])(x)
+    x = Interp([473, 473])(x)
 
     model = get_segmentation_model(inp, x)
 
