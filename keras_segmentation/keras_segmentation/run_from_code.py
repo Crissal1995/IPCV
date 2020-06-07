@@ -129,7 +129,7 @@ def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
                 "0uxn14y26jcui4v/pspnet50_ade20k.h5?dl=1"
     latest_weights = get_file("pspnet50_ade20k.h5", model_url)
     
-    model = pspnet_50_sunrgb(height=height,width=width)
+    model = pspnet_50_sunrgb(input_height=height,input_width=width)
     model.load_weights(latest_weights)
     return model
 
