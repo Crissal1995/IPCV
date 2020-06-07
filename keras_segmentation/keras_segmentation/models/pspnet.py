@@ -114,10 +114,10 @@ def pspnet_50_slim(n_classes,  input_height=256, input_width=256):
 def pspnet_50_sunrgb(input_height=473, input_width=473):
     from ._pspnet_2 import _build_sunrgb_pspnet
 
-    nb_classes = n_classes
+    nb_classes = 150
     resnet_layers = 50
     input_shape = (input_height, input_width)
-    model = _build_sunrgb_pspnet(nb_classes=150,
+    model = _build_sunrgb_pspnet(nb_classes=nb_classes,
                           resnet_layers=resnet_layers,
                           input_shape=input_shape)
     model.model_name = "pspnet_50_sunrgb"
