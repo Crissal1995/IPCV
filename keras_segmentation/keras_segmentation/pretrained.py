@@ -32,11 +32,11 @@ def resnet_pspnet_VOC12_v0_1():
 
 
 # pretrained model converted from caffe by Vladkryvoruchko ... thanks !
-def pspnet_50_ADE_20K():
+def pspnet_50_ADE_20K(height=473,width=473):
 
     model_config = {
-        "input_height": 473,
-        "input_width": 473,
+        "input_height": height,
+        "input_width": width,
         "n_classes": 150,
         "model_class": "pspnet_50",
     }

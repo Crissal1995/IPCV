@@ -3,12 +3,46 @@ import warnings
 import numpy as np
 from keras.layers import Layer
 from keras.activations import linear
+import tensorflow as tf
+from keras.utils import custom_object_scope
+
+class Interp(Layer):
+
+    def __init__(self, new_size, **kwargs):
+        self.new_size = new_size
+        super(Interp, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        super(Interp, self).build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        new_height, new_width = self.new_size
+        try:
+            resized = tf.image.resize(inputs, [new_height, new_width])
+        except AttributeError:
+            resized = tf.image.resize_images(inputs, [new_height, new_width],
+                                             align_corners=True)
+        return resized
+
+    def compute_output_shape(self, input_shape):
+        return tuple([None,
+                      self.new_size[0],
+                      self.new_size[1],
+                      input_shape[3]])
+
+    def get_config(self):
+        config = super(Interp, self).get_config()
+        config['new_size'] = self.new_size
+        return config
 
 
 def clean_copy(model):
     """Returns a copy of the model without other model uses of its layers."""
     weights = model.get_weights()
-    new_model = model.__class__.from_config(model.get_config())
+    # Modifica del codice con aggiunta di custom object
+    custom_objects={'Interp': Interp}
+    with custom_object_scope(custom_objects):
+        new_model = model.__class__.from_config(model.get_config())
     new_model.set_weights(weights)
     return new_model
 

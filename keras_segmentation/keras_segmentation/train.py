@@ -18,6 +18,7 @@ from time import time
 import matplotlib.pyplot as plt
 from keras.callbacks import TensorBoard
 from keras.callbacks import CSVLogger
+#import ridurre
 
 #from keras import metrics
 # import tensorflow as tf
@@ -82,6 +83,62 @@ class CheckpointsCallback(Callback):
             self.model.save_weights(self.checkpoints_path + "cp." + str(epoch))
             print("saved ", self.checkpoints_path + "cp." + str(epoch))
             TensorBoard(log_dir='logs/{}'.format(time()))
+     
+import numpy as np
+def prunew(layer_weights,percentage):
+    a = len(layer_weights)
+    N = a*(100-percentage)/100
+    N = int(round(N))
+    final_list = []
+    l2 = layer_weights.flatten()
+    l3 = layer_weights.flatten()
+  
+    for i in range(0, N):
+        max1 = 0
+        ind = 0
+          
+        for j in range(len(l2)):  
+            l2[j]
+            if abs(l2[j]) > abs(max1):
+              
+                max1 = l2[j];
+                ind = j;
+        l2 = np.delete(l2,ind);           
+        final_list.append(max1) 
+    t = min(map(abs, final_list))
+    for k in range(len(l3)):
+      if abs(l3[k]) < t:
+        l3[k] = 0; 
+      else:
+        pass
+    return l3
+
+def prune(model,percentage=90):
+    w = model.get_weights()
+    we = []
+    wo = []
+    wep = []
+    for i in range(len(w)):
+      if i%2==0:
+        we.append(w[i])
+      else:
+        wo.append(w[i])
+    
+    for z in we:
+      if len(z)>100:
+        pr = prunew(z,percentage)
+        prr = np.reshape(pr,z.shape)
+        wep.append(prr)
+      else:
+        wep.append(z)
+    wprunedfinal = []
+    for i in range(5):
+      wprunedfinal.append(wep[i])
+      wprunedfinal.append(wo[i])
+    
+    pmodel = model
+    pmodel.set_weights(wprunedfinal)
+    return pmodel
 
 
 def train(model,
@@ -136,6 +193,25 @@ def train(model,
     if validate:
         assert val_images is not None
         assert val_annotations is not None
+        
+    # def compile_model(model):
+    #      model.compile(loss=loss_type,
+    #                   optimizer=optimizer_name,
+    #                   metrics=metrics_used)
+         
+    # def finetune_model(model, initial_epoch, finetune_epochs):
+    #     if not validate:
+    #         history = model.fit_generator(train_gen, steps_per_epoch,
+    #                                       epochs=finetune_epochs, callbacks=callbacks,
+    #                                       initial_epoch=initial_epoch)
+    #     else:
+    #         history = model.fit_generator(train_gen,
+    #                             steps_per_epoch,
+    #                             validation_data=val_gen,
+    #                             validation_steps=val_steps_per_epoch,
+    #                             epochs=finetune_epochs, callbacks=callbacks,
+    #                             use_multiprocessing=gen_use_multiprocessing,
+    #                             initial_epoch=initial_epoch)
 
     if optimizer_name is not None:
 
@@ -149,9 +225,8 @@ def train(model,
         #               optimizer=optimizer_name,
         #               #metrics=['accuracy'])
         #               metrics=['accuracy', metrics.MeanIoU(name='model_iou', num_classes=n_classes)])
-        model.compile(loss=loss_type,
-                      optimizer=optimizer_name,
-                      metrics=metrics_used)
+        #compile_model(model)
+        model.compile(loss=loss_type, optimizer=optimizer_name, metrics=metrics_used)
 
     if checkpoints_path is not None:
         with open(checkpoints_path+"_config.json", "w") as f:
@@ -213,30 +288,40 @@ def train(model,
                             validation_steps=val_steps_per_epoch,
                             epochs=epochs, callbacks=callbacks,
                             use_multiprocessing=gen_use_multiprocessing)
+        
+    # if finetune_epochs > 0:
+        
+        # pruning = ridurre.KMeansFilterPruning(0.6, compile_model, 
+        #                                       finetune_model, finetune_epochs,
+        #                                       maximum_pruning_percent=0.4,
+        #                                       maximum_prune_iterations=12)
+        # model, num = pruning.run_pruning(model)
+        # print(model.summary())
     
     # list all data in history
-    print(history.history.keys())
-    # summarize history for accuracy
-    plt.plot(history.history['accuracy'])
-    plt.plot(history.history['val_accuracy'])
-    plt.title('model accuracy')
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc='upper left')
-    plt.show()
-    # summarize history for loss
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc='upper left')
-    plt.show()
-    # summarize history for loss
-    plt.plot(history.history['mean_iou'])
-    plt.plot(history.history['val_mean_iou'])
-    plt.title('model mean IOU')
-    plt.ylabel('mean_iou')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc='upper left')
-    plt.show()
+    if epochs > 0:
+        print(history.history.keys())
+        # summarize history for accuracy
+        plt.plot(history.history['accuracy'])
+        plt.plot(history.history['val_accuracy'])
+        plt.title('model accuracy')
+        plt.ylabel('accuracy')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'validation'], loc='upper left')
+        plt.show()
+        # summarize history for loss
+        plt.plot(history.history['loss'])
+        plt.plot(history.history['val_loss'])
+        plt.title('model loss')
+        plt.ylabel('loss')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'validation'], loc='upper left')
+        plt.show()
+        # summarize history for loss
+        plt.plot(history.history['mean_iou'])
+        plt.plot(history.history['val_mean_iou'])
+        plt.title('model mean IOU')
+        plt.ylabel('mean_iou')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'validation'], loc='upper left')
+        plt.show()
