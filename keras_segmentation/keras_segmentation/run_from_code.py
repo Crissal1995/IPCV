@@ -23,6 +23,7 @@ from keras_segmentation.models.pspnet import pspnet_50, pspnet_50_sunrgb
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
 from keras_segmentation.train import prune
+from keras_segmentation.custom_losses_metrics import jaccard_crossentropy, masked_jaccard_crossentropy, masked_categorical_accuracy
 from keras.layers import Lambda, Input
 from keras.utils import get_file
 from keras_segmentation.models.segnet import mobilenet_segnet
@@ -51,19 +52,18 @@ def pspnet_50_slim(n_classes,  input_height=256, input_width=256):
     model.model_name = "pspnet_50_slim"
     return model
 
-def jaccard_distance(y_true, y_pred, smooth=100):
-    intersection = K.sum(K.abs(y_true * y_pred), axis = -1)
-    sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis = -1)
-    jac = (intersection + smooth) / (sum_ - intersection + smooth)
-    return (1 - jac) * smooth
+# def jaccard_distance(y_true, y_pred, smooth=100):
+#     intersection = K.sum(K.abs(y_true * y_pred), axis = -1)
+#     sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis = -1)
+#     jac = (intersection + smooth) / (sum_ - intersection + smooth)
+#     return (1 - jac) * smooth
 
-def masked_categorical_crossentropy(gt, pr):
-    from keras.losses import categorical_crossentropy
-    mask = 1 - gt[:, :, 0]
-    return categorical_crossentropy(gt, pr) * mask
+# def masked_categorical_crossentropy(gt, pr):
+#     from keras.losses import categorical_crossentropy
+#     mask = 1 - gt[:, :, 0]
+#     return categorical_crossentropy(gt, pr) * mask
 
-def jaccard_crossentropy(out, tar):
-    return losses.categorical_crossentropy(out, tar) + jaccard_distance(out, tar)
+
 
 
 #pretrained_model = pspnet_50_ADE_20K()
@@ -76,17 +76,17 @@ def jaccard_crossentropy(out, tar):
 
 
     
-def sunrgbize(x):
-    sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
-    total_range = range(0,151)
-    sub_range = [item for item in total_range if item not in sunrgb_class_range]
+# def sunrgbize(x):
+#     sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
+#     total_range = range(0,151)
+#     sub_range = [item for item in total_range if item not in sunrgb_class_range]
 
-    concat = x[:,:,:,127,None] #Simulates the empty class
-    for i in sunrgb_class_range:
-        new_slice = x[:,:,:,i-1,None]
-        concat = K.concatenate([concat,new_slice], axis=-1)
+#     concat = x[:,:,:,127,None] #Simulates the empty class
+#     for i in sunrgb_class_range:
+#         new_slice = x[:,:,:,i-1,None]
+#         concat = K.concatenate([concat,new_slice], axis=-1)
     
-    return concat
+#     return concat
 
 # def convertToSunRgb(model,distructive=False):
 #     sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
@@ -134,7 +134,7 @@ def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
     return model
 
 
-mode = 3
+mode = 1
 trainingFromInit = True
 evaluate = True
 
@@ -205,8 +205,8 @@ if mode == 0:
         validate = True,
         verify_dataset = False,
         optimizer_name = opt,
-        loss_type = jaccard_crossentropy,
-        metrics_used = ['accuracy', metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
+        loss_type = masked_jaccard_crossentropy,
+        metrics_used = [masked_categorical_accuracy, metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
         do_augment = False,
         gen_use_multiprocessing = False,
         ignore_zero_class = False,
@@ -219,26 +219,56 @@ if mode == 0:
     #         annotations_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/seg/"
     #     ))
 elif mode == 1:
-    #sun_inp_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/rgb/"
-    #sun_ann_dir = "C:/Users/UC/Desktop/image-segmentation-keras-master/sunrgb/test/seg/"
+
     sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
     sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
         
-    chosen_img = "img_00027.png"
+    chosen_img = "img_00005.png"
         
     checkpoints_path = init+"ipcv_checkpoints/"
     all_checkpoint_folders = glob.glob(checkpoints_path + "*")
     
     import matplotlib.pyplot as plt
-    fig, axes = plt.subplots(1,len(all_checkpoint_folders)+2)
+    from math import ceil
+    size = int(ceil(len(all_checkpoint_folders)+3)/2)
+    fig, axes = plt.subplots(2,size)
     img = plt.imread(sun_inp_dir+chosen_img)
-    axes[0].set_title('Original', fontsize=6)
-    axes[0].imshow(img)
+    axes[0][0].set_title('Original', fontsize=6)
+    axes[0][0].imshow(img)
     img2 = plt.imread(sun_ann_dir+chosen_img)
-    axes[1].set_title('Segmentation', fontsize=6)
-    axes[1].imshow(img2)
+    axes[0][1].set_title('Segmentation', fontsize=6)
+    axes[0][1].imshow(img2)
+    model = pspnet_50_ADE_20K_SUNRGB()
+    n_classes = 38
+    folder = "pspnet_50_ade20k_sunrgb_untrained"
+
+    out = model.predict_segmentation(
+        inp=sun_inp_dir+chosen_img,
+        out_fname=init+"/ipcv_out/"+folder+"_"+chosen_img
+    )
     
-    i = 2
+    # evaluating the model 
+    if evaluate:
+        evaluation = model.evaluate_segmentation( 
+            inp_images_dir=sun_inp_dir, 
+            annotations_dir=sun_ann_dir)#,
+            # optimizer=opt,
+            # loss=loss_type,
+            # metrics=metrics_used) 
+        print(evaluation)
+        
+        axes[0][2].set_title(
+            folder+
+            #"\n("+str(round(100*evaluation['loss'])/100)+
+            #" - "+str(round(100*evaluation['accuracy'])/100)+
+            "\n("+str(round(100*evaluation['frequency_weighted_IoU'])/100)+
+            " - "+str(round(100*evaluation['mean_IoU'])/100)+")", fontsize=6)
+        axes[0][2].imshow(out)
+    else:
+        axes[0][2].set_title(folder, fontsize=6)
+        axes[0][2].imshow(out)
+    
+    i = 3
     for folder in all_checkpoint_folders:
         #from models.all_models import model_from_name
         #model_from_name["vgg_unet"] = unet.vgg_unet
@@ -258,13 +288,15 @@ elif mode == 1:
         assert (os.path.isfile(latest_weights)), "Weights not found."
         #model = model_from_name[model_config['model_class']](
         
-        if model_config['model_class'] == "":
+        if model_config['model_class'] == "" or model_config['model_class'] == "pspnet_50_sunrgb":
             model = pspnet_50_ADE_20K_SUNRGB()
+            n_classes = 38
             #model = convertToSunRgb(model)
         else:
             model = model_from_name[model_config['model_class']](
                 model_config['n_classes'], input_height=model_config['input_height'],
                 input_width=model_config['input_width'])
+            n_classes = model_config['n_classes']
         print("loaded weights ", latest_weights)
         model.load_weights(latest_weights)
         #print(model.summary())
@@ -275,19 +307,31 @@ elif mode == 1:
             out_fname=init+"/ipcv_out/"+folder+"_"+latest_weights[-2:]+"_"+chosen_img
         )
         
+        opt = optimizers.Adam(learning_rate=10e-6)
+        loss_type = masked_jaccard_crossentropy
+        metrics_used = [masked_categorical_accuracy, metrics.MeanIoU(name='mean_iou', num_classes=n_classes)]
+        
         # evaluating the model 
         if evaluate:
-            evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+            evaluation = model.evaluate_segmentation( 
+                inp_images_dir=sun_inp_dir, 
+                annotations_dir=sun_ann_dir)#,
+                # optimizer=opt,
+                # loss=loss_type,
+                # metrics=metrics_used) 
             print(evaluation)
-            axes[i].set_title(
+            
+            axes[int(i/size)][int((i)%size)].set_title(
                 folder+"_"+
                 latest_weights[-2:]+
-                "_("+str(round(100*evaluation['frequency_weighted_IU'])/100)+
-                " - "+str(round(100*evaluation['mean_IU'])/100)+")", fontsize=6)
-            axes[i].imshow(out)
+                #"\n("+str(round(100*evaluation['loss'])/100)+
+                #" - "+str(round(100*evaluation['accuracy'])/100)+
+                "\n("+str(round(100*evaluation['frequency_weighted_IoU'])/100)+
+                " - "+str(round(100*evaluation['mean_IoU'])/100)+")", fontsize=6)
+            axes[int(i/size)][int((i)%size)].imshow(out)
         else:
-            axes[i].set_title(folder+"_"+latest_weights[-2:], fontsize=6)
-            axes[i].imshow(out)
+            axes[int(i/size)][int((i)%size)].set_title(folder+"_"+latest_weights[-2:], fontsize=6)
+            axes[int(i/size)][int((i)%size)].imshow(out)
             
         i += 1
     
@@ -328,7 +372,7 @@ elif mode == 2:
     
     out = model.predict_segmentation(
         inp=sun_inp_dir+chosen_img,
-        out_fname=init+"/ipcv_out/pspne5_50_ade20k_"+chosen_img
+        out_fname=init+"/ipcv_out/pspnet_50_ade20k_"+chosen_img
     )
     
     # evaluating the model 
@@ -337,8 +381,8 @@ elif mode == 2:
         print(evaluation)
         axes[2].set_title(
             "pspnet_50_ade20k"+
-            "_("+str(round(100*evaluation['frequency_weighted_IU'])/100)+
-            " - "+str(round(100*evaluation['mean_IU'])/100)+")", fontsize=6)
+            "_("+str(round(100*evaluation['frequency_weighted_IoU'])/100)+
+            " - "+str(round(100*evaluation['mean_IoU'])/100)+")", fontsize=6)
         axes[2].imshow(out)
     else:
         axes[2].set_title("pspnet_50_ade20k", fontsize=6)
@@ -373,8 +417,8 @@ elif mode == 3:
     sun_inp_dir = init+"half_sunrgb/test/rgb/"
     sun_ann_dir = init+"half_sunrgb/test/seg/"
     
-    # evaluation1 = model1.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
-    # print(evaluation1)
+    evaluation1 = model1.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
+    print(evaluation1)
     
     if print_models:
         tf.keras.utils.plot_model(
@@ -478,3 +522,23 @@ elif mode == 3:
     #evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
     #print(evaluation)
     
+elif mode == 4:
+    sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+        
+    chosen_imgs = ["img_00005.png","img_00015.png","img_00019.png",
+                   "img_00022.png","img_00023.png","img_00025.png",
+                   "img_00027.png","img_00052.png","img_00055.png",
+                   "img_00061.png"]
+    
+    import matplotlib.pyplot as plt
+    
+    fig, axes = plt.subplots(2,5)
+    i = 0
+    for chosen_img in chosen_imgs:
+        img = plt.imread(sun_ann_dir+chosen_img)
+        axes[int(i/5)][int(i%5)].imshow(img)
+        i += 1
+        
+    plt.show()
+    fig.set_size_inches(14,10)
+    plt.savefig(init+"/ipcv_out/segmentations.png")

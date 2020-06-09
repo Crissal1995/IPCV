@@ -13,26 +13,11 @@ import glob
 import six
 from keras.callbacks import Callback
 import re
-from keras import backend as K
+
 from time import time
 import matplotlib.pyplot as plt
 from keras.callbacks import TensorBoard
 from keras.callbacks import CSVLogger
-#import ridurre
-
-#from keras import metrics
-# import tensorflow as tf
-
-# class MeanIoU(metrics.MeanIoU):
-#     def __call__(self, y_true, y_pred, sample_weight=None):
-#         y_pred = tf.argmax(y_pred, axis=-1)
-#         return super().__call__(y_true, y_pred, sample_weight=sample_weight)
-    
-def jaccard_distance(y_true, y_pred, smooth=100):
-    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
-    sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis=-1)
-    jac = (intersection + smooth) / (sum_ - intersection + smooth)
-    return (1 - jac) * smooth
 
 
 def find_latest_checkpoint(checkpoints_path, fail_safe=True):
@@ -62,12 +47,6 @@ def find_latest_checkpoint(checkpoints_path, fail_safe=True):
                                   key=lambda f:
                                   int(get_epoch_number_from_path(f)))
     return latest_epoch_checkpoint
-
-
-def masked_categorical_crossentropy(gt, pr):
-    from keras.losses import categorical_crossentropy
-    mask = 1 - gt[:, :, 0]
-    return categorical_crossentropy(gt, pr) * mask
 
 
 class CheckpointsCallback(Callback):
@@ -160,7 +139,6 @@ def train(model,
           steps_per_epoch=512,
           val_steps_per_epoch=512,
           gen_use_multiprocessing=False,
-          ignore_zero_class=False,
           optimizer_name='adadelta',
           loss_type='categorical_crossentropy',
           metrics_used=['accuracy'],
@@ -309,6 +287,7 @@ def train(model,
         plt.xlabel('epoch')
         plt.legend(['train', 'validation'], loc='upper left')
         plt.show()
+        plt.savefig('accuracy.png')
         # summarize history for loss
         plt.plot(history.history['loss'])
         plt.plot(history.history['val_loss'])
@@ -317,6 +296,7 @@ def train(model,
         plt.xlabel('epoch')
         plt.legend(['train', 'validation'], loc='upper left')
         plt.show()
+        plt.savefig('loss.png')
         # summarize history for loss
         plt.plot(history.history['mean_iou'])
         plt.plot(history.history['val_mean_iou'])
@@ -325,3 +305,4 @@ def train(model,
         plt.xlabel('epoch')
         plt.legend(['train', 'validation'], loc='upper left')
         plt.show()
+        plt.savefig('mean_iou.png')

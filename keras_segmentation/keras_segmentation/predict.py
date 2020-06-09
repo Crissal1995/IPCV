@@ -299,6 +299,7 @@ def predict_video(model=None, inp=None, output=None,
 
 def evaluate(model=None, inp_images=None, annotations=None,
              inp_images_dir=None, annotations_dir=None, checkpoints_path=None):
+             #, optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy']):
 
     if model is None:
         assert (checkpoints_path is not None),\
@@ -346,9 +347,13 @@ def evaluate(model=None, inp_images=None, annotations=None,
     n_pixels_norm = n_pixels / np.sum(n_pixels)
     frequency_weighted_IU = np.sum(cl_wise_score*n_pixels_norm)
     mean_IU = np.mean(cl_wise_score)
+    #model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+    #results = model.evaluate(inp_images_dir, annotations_dir)
 
     return {
-        "frequency_weighted_IU": frequency_weighted_IU,
-        "mean_IU": mean_IU,
-        "class_wise_IU": cl_wise_score
+        #"loss": results[0],
+        #"accuracy": results[1],
+        "frequency_weighted_IoU": frequency_weighted_IU,
+        "mean_IoU": mean_IU,
+        "class_wise_IoU": cl_wise_score
     }
