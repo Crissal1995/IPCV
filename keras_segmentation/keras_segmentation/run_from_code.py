@@ -23,7 +23,7 @@ from keras_segmentation.models.pspnet import pspnet_50, pspnet_50_sunrgb
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
 from keras_segmentation.train import prune
-from keras_segmentation.custom_losses_metrics import jaccard_crossentropy, masked_jaccard_crossentropy, masked_categorical_accuracy
+from keras_segmentation.custom_losses_metrics import jaccard_crossentropy, masked_jaccard_crossentropy, masked_categorical_accuracy, mild_categorical_crossentropy
 from keras.layers import Lambda, Input
 from keras.utils import get_file
 from keras_segmentation.models.segnet import mobilenet_segnet
@@ -134,7 +134,7 @@ def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
     return model
 
 
-mode = 1
+mode = 0
 trainingFromInit = True
 evaluate = True
 
@@ -153,8 +153,8 @@ if mode == 0:
         model = pspnet_50_ADE_20K_SUNRGB()
         #model = convertToSunRgb(model)
         #print(model.summary())
-        prun_schedule = PolynomialDecay(initial_sparsity=0.0, final_sparsity=0.5,begin_step=2000,end_step=4000)
-        model = prune_low_magnitude(model, pruning_schedule=prun_schedule)
+        #prun_schedule = PolynomialDecay(initial_sparsity=0.0, final_sparsity=0.5,begin_step=2000,end_step=4000)
+        #model = prune_low_magnitude(model, pruning_schedule=prun_schedule)
         
         opt = optimizers.Adam(learning_rate=0.0001)
     else:
@@ -205,12 +205,11 @@ if mode == 0:
         validate = True,
         verify_dataset = False,
         optimizer_name = opt,
-        loss_type = masked_jaccard_crossentropy,
+        loss_type = mild_categorical_crossentropy,
         metrics_used = [masked_categorical_accuracy, metrics.MeanIoU(name='mean_iou', num_classes=n_classes)],
         do_augment = False,
         gen_use_multiprocessing = False,
-        ignore_zero_class = False,
-        epochs = 25
+        epochs = 5
     )
     
     # print(model.summary())
@@ -223,7 +222,7 @@ elif mode == 1:
     sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
     sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
         
-    chosen_img = "img_00005.png"
+    chosen_img = "img_00027.png"
         
     checkpoints_path = init+"ipcv_checkpoints/"
     all_checkpoint_folders = glob.glob(checkpoints_path + "*")
@@ -339,7 +338,7 @@ elif mode == 1:
     #mng.window.showMaximized()
     plt.show()
     fig.set_size_inches(14,10)
-    plt.savefig(init+"/ipcv_out/all_models.png")
+    plt.savefig(init+"/ipcv_out/all_models_"+chosen_img)
 elif mode == 2:
     #pretrained_model = pspnet_50_ADE_20K()
     #model = pspnet_50( n_classes=38 ) # accuracy: 0.5348 10 epochs
