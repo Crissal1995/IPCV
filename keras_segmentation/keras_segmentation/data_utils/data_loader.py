@@ -37,7 +37,7 @@ class DataLoaderError(Exception):
     pass
 
 
-def get_pairs_from_paths(images_path, segs_path, ignore_non_matching=False):
+def get_pairs_from_paths(images_path, segs_path, ignore_non_matching=False, split_factor=1):
     """ Find all the images from the images_path directory and
         the segmentation images from the segs_path directory
         while checking integrity of data """
@@ -48,26 +48,38 @@ def get_pairs_from_paths(images_path, segs_path, ignore_non_matching=False):
     image_files = []
     segmentation_files = {}
 
+    count = 0
     for dir_entry in os.listdir(images_path):
-        if os.path.isfile(os.path.join(images_path, dir_entry)) and \
+        if count < int(len(os.listdir(images_path))/split_factor):
+            if os.path.isfile(os.path.join(images_path, dir_entry)) and \
                 os.path.splitext(dir_entry)[1] in ACCEPTABLE_IMAGE_FORMATS:
-            file_name, file_extension = os.path.splitext(dir_entry)
-            image_files.append((file_name, file_extension,
-                                os.path.join(images_path, dir_entry)))
-
+                file_name, file_extension = os.path.splitext(dir_entry)
+                image_files.append((file_name, file_extension,
+                                    os.path.join(images_path, dir_entry)))
+        else:
+            break
+        
+        count = count+1
+        
+    count = 0
     for dir_entry in os.listdir(segs_path):
-        if os.path.isfile(os.path.join(segs_path, dir_entry)) and \
-           os.path.splitext(dir_entry)[1] in ACCEPTABLE_SEGMENTATION_FORMATS:
-            file_name, file_extension = os.path.splitext(dir_entry)
-            full_dir_entry = os.path.join(segs_path, dir_entry)
-            if file_name in segmentation_files:
-                raise DataLoaderError("Segmentation file with filename {0}"
-                                      " already exists and is ambiguous to"
-                                      " resolve with path {1}."
-                                      " Please remove or rename the latter."
-                                      .format(file_name, full_dir_entry))
-
-            segmentation_files[file_name] = (file_extension, full_dir_entry)
+        if count < int(len(os.listdir(segs_path))/split_factor):
+            if os.path.isfile(os.path.join(segs_path, dir_entry)) and \
+               os.path.splitext(dir_entry)[1] in ACCEPTABLE_SEGMENTATION_FORMATS:
+                file_name, file_extension = os.path.splitext(dir_entry)
+                full_dir_entry = os.path.join(segs_path, dir_entry)
+                if file_name in segmentation_files:
+                    raise DataLoaderError("Segmentation file with filename {0}"
+                                          " already exists and is ambiguous to"
+                                          " resolve with path {1}."
+                                          " Please remove or rename the latter."
+                                          .format(file_name, full_dir_entry))
+    
+                segmentation_files[file_name] = (file_extension, full_dir_entry)
+        else:
+            break
+        
+        count = count+1
 
     return_value = []
     # Match the images and segmentations

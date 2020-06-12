@@ -23,6 +23,7 @@ from keras_segmentation.models.pspnet import pspnet_50, pspnet_50_sunrgb
 from keras_segmentation.models.pspnet import resnet50_pspnet
 from keras_segmentation.models._pspnet_2 import Interp
 from keras_segmentation.train import prune
+from keras_segmentation.predict import display, fix_zero_labeling, fix_dataset, evaluate_segmentation
 from keras_segmentation.custom_losses_metrics import jaccard_crossentropy, masked_jaccard_crossentropy, masked_categorical_accuracy, mild_categorical_crossentropy
 from keras.layers import Lambda, Input
 from keras.utils import get_file
@@ -33,6 +34,7 @@ from keras import losses
 from keras import optimizers
 from kerassurgeon import identify
 from kerassurgeon.operations import delete_channels,delete_layer
+import matplotlib.pyplot as plt
 import tensorflow as tf
 #import tensorflow_model_optimization as tfmot
 from tensorflow_model_optimization.sparsity.keras import PolynomialDecay
@@ -134,7 +136,7 @@ def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
     return model
 
 
-mode = 0
+mode = 3
 trainingFromInit = True
 evaluate = True
 
@@ -150,13 +152,35 @@ if mode == 0:
     
     if trainingFromInit:
         #model = pspnet_50_slim( n_classes=38 ) # accuracy: 0.5348 10 epochs
-        model = pspnet_50_ADE_20K_SUNRGB()
+        #model = pspnet_50_ADE_20K_SUNRGB()
         #model = convertToSunRgb(model)
         #print(model.summary())
         #prun_schedule = PolynomialDecay(initial_sparsity=0.0, final_sparsity=0.5,begin_step=2000,end_step=4000)
         #model = prune_low_magnitude(model, pruning_schedule=prun_schedule)
+        model = pspnet_50( n_classes=38 )
+        pretrained_model = pspnet_50_ADE_20K()
         
-        opt = optimizers.Adam(learning_rate=0.0001)
+        tf.keras.utils.plot_model(
+            model,
+            to_file=init+"pspnet_50.png",
+            show_shapes=True,
+            show_layer_names=True,
+            rankdir="TB",
+            expand_nested=False,
+            dpi=96,
+        )
+        tf.keras.utils.plot_model(
+            pretrained_model,
+            to_file=init+"pspnet_50_ade_20k.png",
+            show_shapes=True,
+            show_layer_names=True,
+            rankdir="TB",
+            expand_nested=False,
+            dpi=96,
+        )
+        transfer_weights( pretrained_model, model, trainable_source=True  )
+        
+        opt = optimizers.Adam(learning_rate=0.00001)
     else:
         checkpoints_path = init+"pspnet_50_slim_checkpoint_50/"
         full_config_path = checkpoints_path+"_config.json"
@@ -227,7 +251,6 @@ elif mode == 1:
     checkpoints_path = init+"ipcv_checkpoints/"
     all_checkpoint_folders = glob.glob(checkpoints_path + "*")
     
-    import matplotlib.pyplot as plt
     from math import ceil
     size = int(ceil(len(all_checkpoint_folders)+3)/2)
     fig, axes = plt.subplots(2,size)
@@ -239,7 +262,7 @@ elif mode == 1:
     axes[0][1].imshow(img2)
     model = pspnet_50_ADE_20K_SUNRGB()
     n_classes = 38
-    folder = "pspnet_50_ade20k_sunrgb_untrained"
+    folder = "pspnet_50_ade20K_untrained"
 
     out = model.predict_segmentation(
         inp=sun_inp_dir+chosen_img,
@@ -353,7 +376,7 @@ elif mode == 2:
     sun_inp_dir = init+"half_sunrgb/test/rgb/"
     sun_ann_dir = init+"half_sunrgb/test/seg/"
         
-    chosen_img = "img_00027.png"
+    chosen_img = "img_06600.png"
         
     #checkpoints_path = init+"ipcv_checkpoints/"
     #all_checkpoint_folders = glob.glob(checkpoints_path + "*")
@@ -396,7 +419,7 @@ elif mode == 2:
 elif mode == 3:
     print_models = False
     model = pspnet_50_slim(n_classes = 38)
-    print(model.summary())
+    #print(model.summary())
     
     if print_models:
         tf.keras.utils.plot_model(
@@ -411,29 +434,15 @@ elif mode == 3:
     
     model1 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
     #model1 = convertToSunRgb(model1,distructive=False)
-    print(model1.summary())
+    #print(model1.summary())
     
     sun_inp_dir = init+"half_sunrgb/test/rgb/"
     sun_ann_dir = init+"half_sunrgb/test/seg/"
     
-    evaluation1 = model1.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
-    print(evaluation1)
-    
-    if print_models:
-        tf.keras.utils.plot_model(
-            model1,
-            to_file=init+"pspnet_50_ade_20k_resized.png",
-            show_shapes=True,
-            show_layer_names=True,
-            rankdir="TB",
-            expand_nested=False,
-            dpi=96,
-        )
-    
-    model2 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
+    model1 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
     #model2 = convertToSunRgb(model2,distructive=False)
     
-    checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_trained/"
+    checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_trained_4/"
     full_config_path = checkpoints_path+"\_config.json"
     #print(full_config_path)
     assert (os.path.isfile(full_config_path)
@@ -451,7 +460,66 @@ elif mode == 3:
     #model = model_from_name[model_config['model_class']](
 
     print("loaded weights ", latest_weights)
-    model2.load_weights(latest_weights)
+    model1.load_weights(latest_weights)
+    
+    #fix_dataset(model1,checkpoints_path,source_path="C:/Users/UC/Desktop/sunrgb/", 
+                destination_path="C:/Users/UC/Desktop/fixed_segs/")
+    
+    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=2))
+    
+    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="Mean", split_factor=2))
+    
+    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="Weighted", split_factor=2))
+    
+    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="Trustful", split_factor=2))
+    
+    sun_ann_dir="C:/Users/UC/Desktop/fixed_segs/test/"
+    
+    # Da attivare solo quando si ha solo il dataset con classi anche unlabeled
+    # fix_dataset(model1,checkpoints_path)
+    
+    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=2))
+    
+
+    
+    if print_models:
+        tf.keras.utils.plot_model(
+            model1,
+            to_file=init+"pspnet_50_ade_20k_resized.png",
+            show_shapes=True,
+            show_layer_names=True,
+            rankdir="TB",
+            expand_nested=False,
+            dpi=96,
+        )
+    
+    # model2 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
+    # #model2 = convertToSunRgb(model2,distructive=False)
+    
+    # checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_trained/"
+    # full_config_path = checkpoints_path+"\_config.json"
+    # #print(full_config_path)
+    # assert (os.path.isfile(full_config_path)
+    # #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
+    #         ), "Checkpoint not found."
+    # model_config = json.loads(
+    #     open(full_config_path, "r").read())
+    # #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
+    # latest_weights = find_latest_checkpoint(checkpoints_path+"/")
+    # #assert (os.path.isfile("./"+checkpoints_path+".4")
+    #         #), "Weights not found."
+    # #latest_weights = checkpoints_path+".4"
+    # assert (latest_weights is not None), "Weights not found."
+    # assert (os.path.isfile(latest_weights)), "Weights not found."
+    # #model = model_from_name[model_config['model_class']](
+
+    # print("loaded weights ", latest_weights)
+    # model2.load_weights(latest_weights)
     
     # evaluation2 = model2.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
     # print(evaluation2)
@@ -516,20 +584,20 @@ elif mode == 3:
     
     # print(equal_count)
     # print(total)
-    sun_inp_dir = init+"half_sunrgb/test/rgb/"
-    sun_ann_dir = init+"half_sunrgb/test/seg/"
+    #sun_inp_dir = init+"half_sunrgb/test/rgb/"
+    #sun_ann_dir = init+"half_sunrgb/test/seg/"
     #evaluation = model.evaluate_segmentation( inp_images_dir=sun_inp_dir  , annotations_dir=sun_ann_dir ) 
     #print(evaluation)
     
 elif mode == 4:
+    sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
     sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+    pred = "C:/Users/UC/Desktop/ipcv_out/pspnet_50_ade20K_untrained_img_00027_gray.png"
         
     chosen_imgs = ["img_00005.png","img_00015.png","img_00019.png",
                    "img_00022.png","img_00023.png","img_00025.png",
                    "img_00027.png","img_00052.png","img_00055.png",
                    "img_00061.png"]
-    
-    import matplotlib.pyplot as plt
     
     fig, axes = plt.subplots(2,5)
     i = 0
@@ -541,3 +609,15 @@ elif mode == 4:
     plt.show()
     fig.set_size_inches(14,10)
     plt.savefig(init+"/ipcv_out/segmentations.png")
+    
+elif mode == 5:
+    train_list = ["pspnet_50_ade20K_untrained","pspnet_50_89","pspnet_50_20K_trained_1_24",
+                  "pspnet_50_20K_trained_2_24","pspnet_50_20K_trained_3_19","pspnet_50_20K_trained_4_24",
+                  "pspnet_50_slim_22","pspnet_50_slim_last_24","pspnet_50_slim_new_32"]
+    sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
+    sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+    pred_dir = "C:/Users/UC/Desktop/ipcv_out/"
+    labels = json.load(open('labels.json'))
+    for model in train_list:
+        display_list = [plt.imread(sun_inp_dir+"img_00027.png"),plt.imread(sun_ann_dir+"img_00027.png"),plt.imread(pred_dir+model+"_img_00027_gray.png")]
+        display(display_list, labels, height=8, name=model)

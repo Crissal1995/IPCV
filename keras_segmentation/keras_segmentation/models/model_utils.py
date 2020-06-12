@@ -22,13 +22,16 @@ else:
 
 
 # source m1 , dest m2
-def transfer_weights(m1, m2, verbose=True):
+def transfer_weights(m1, m2, verbose=True, trainable_source=True):
 
     assert len(m1.layers) == len(
         m2.layers), "Both models should have same number of layers"
 
     nSet = 0
     nNotSet = 0
+    
+    nTrainable = 0
+    nNotTrainable = 0
 
     if verbose:
         print("Copying weights ")
@@ -43,12 +46,21 @@ def transfer_weights(m1, m2, verbose=True):
             if len(list(l.weights)) > 0:
                 ll.set_weights(l.get_weights())
                 nSet += 1
+            if trainable_source:
+                ll.trainable = True
+                nTrainable += 1
+            else:
+                ll.trainable = False
+                nNotTrainable += 1
         else:
             nNotSet += 1
+            nTrainable += 1
 
     if verbose:
         print("Copied weights of %d layers and skipped %d layers" %
               (nSet, nNotSet))
+        print("The new model has %d trainable layers and %d not trainable layers" %
+              (nTrainable, nNotTrainable))
 
 
 def resize_image(inp,  s, data_format):
