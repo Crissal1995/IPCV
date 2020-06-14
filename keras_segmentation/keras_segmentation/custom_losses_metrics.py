@@ -8,7 +8,7 @@ Created on Tue Jun  9 16:41:27 2020
 from keras import backend as K
 from keras.losses import categorical_crossentropy
 import tensorflow as tf
-import sys
+import numpy as np
 #import ridurre
 
 #from keras import metrics
@@ -80,7 +80,6 @@ def generate_onehot(a):
     tf.print(onehot)
     return onehot
 
-import numpy as np
 def mild_categorical_crossentropy(gt, pr):
     from keras.losses import categorical_crossentropy
     
@@ -97,23 +96,6 @@ def mild_categorical_crossentropy(gt, pr):
     gtmult = tf.multiply(gtonehot,gtmask)
     gt1 = tf.add(gt[:,:,1:],gtmult)
     gtf = tf.concat([gt0,gt1],2)
-    
-    
-    #if tf.is_nan(K.any(gt)):
-    # zero = tf.constant(0, dtype=tf.float32)
-    # one = tf.constant(1, dtype=tf.float32)
-    # whereGT = tf.equal(gt, zero)
-    # #whereGT = tf.dtypes.cast(whereGT, tf.float32)
-    # wherePR = tf.not_equal(gt, zero)
-    # #wherePR = tf.dtypes.cast(wherePR, tf.float32)
-    # gt = tf.cond(tf.logical_and(whereGT,wherePR), lambda: tf.reduce_sum([[gt],[pr]],0), lambda: gt)
-        
-        # for idx_3, (yt_3, yp_3) in enumerate(zip(gt.numpy(),pr.numpy())):
-        #     for idx_2, (yt_2, yp_2) in enumerate(zip(yt_3,yp_3)):
-        #         for idx_1, (yt_1, yp_1) in enumerate(zip(yt_2,yp_2)):
-        #             for idx_0, (yt_0, yp_0) in enumerate(zip(yt_1,yp_1)):
-        #                 if yt_0 == 0 and yp_0 != 0:
-        #                     gt[idx_0,idx_1,idx_2,idx_3] = yp_0
                     
     return categorical_crossentropy(gtf, pr)
 

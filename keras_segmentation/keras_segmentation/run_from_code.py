@@ -136,7 +136,7 @@ def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
     return model
 
 
-mode = 3
+mode = 1
 trainingFromInit = True
 evaluate = True
 
@@ -242,126 +242,197 @@ if mode == 0:
     #         annotations_dir = "/Users/salvatorecapuozzo/Desktop/sunrgb/test/seg/"
     #     ))
 elif mode == 1:
-
+    import sys
+    f = open("C:/Users/UC/Desktop/test_models.out", 'w')
+    sys.stdout = f
+    
     sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
     sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+    labels = json.load(open('labels.json'))
         
-    chosen_img = "img_00027.png"
+    split_factor = 1
+    #chosen_imgs = ["img_00005.png","img_00027.png","img_02592.png","img_04521.png","img_06600.png"]
+    chosen_imgs = ["img_00005.png"]
         
     checkpoints_path = init+"ipcv_checkpoints/"
     all_checkpoint_folders = glob.glob(checkpoints_path + "*")
     
     from math import ceil
-    size = int(ceil(len(all_checkpoint_folders)+3)/2)
-    fig, axes = plt.subplots(2,size)
-    img = plt.imread(sun_inp_dir+chosen_img)
-    axes[0][0].set_title('Original', fontsize=6)
-    axes[0][0].imshow(img)
-    img2 = plt.imread(sun_ann_dir+chosen_img)
-    axes[0][1].set_title('Segmentation', fontsize=6)
-    axes[0][1].imshow(img2)
-    model = pspnet_50_ADE_20K_SUNRGB()
-    n_classes = 38
-    folder = "pspnet_50_ade20K_untrained"
-
-    out = model.predict_segmentation(
-        inp=sun_inp_dir+chosen_img,
-        out_fname=init+"/ipcv_out/"+folder+"_"+chosen_img
-    )
     
-    # evaluating the model 
-    if evaluate:
-        evaluation = model.evaluate_segmentation( 
-            inp_images_dir=sun_inp_dir, 
-            annotations_dir=sun_ann_dir)#,
-            # optimizer=opt,
-            # loss=loss_type,
-            # metrics=metrics_used) 
-        print(evaluation)
-        
-        axes[0][2].set_title(
-            folder+
-            #"\n("+str(round(100*evaluation['loss'])/100)+
-            #" - "+str(round(100*evaluation['accuracy'])/100)+
-            "\n("+str(round(100*evaluation['frequency_weighted_IoU'])/100)+
-            " - "+str(round(100*evaluation['mean_IoU'])/100)+")", fontsize=6)
-        axes[0][2].imshow(out)
-    else:
-        axes[0][2].set_title(folder, fontsize=6)
-        axes[0][2].imshow(out)
-    
-    i = 3
-    for folder in all_checkpoint_folders:
-        #from models.all_models import model_from_name
-        #model_from_name["vgg_unet"] = unet.vgg_unet
-        full_config_path = folder+"\_config.json"
-        #print(full_config_path)
-        assert (os.path.isfile(full_config_path)
-        #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
-                ), "Checkpoint not found."
-        model_config = json.loads(
-            open(full_config_path, "r").read())
-        #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
-        latest_weights = find_latest_checkpoint(folder+"/")
-        #assert (os.path.isfile("./"+checkpoints_path+".4")
-                #), "Weights not found."
-        #latest_weights = checkpoints_path+".4"
-        assert (latest_weights is not None), "Weights not found."
-        assert (os.path.isfile(latest_weights)), "Weights not found."
-        #model = model_from_name[model_config['model_class']](
-        
-        if model_config['model_class'] == "" or model_config['model_class'] == "pspnet_50_sunrgb":
-            model = pspnet_50_ADE_20K_SUNRGB()
-            n_classes = 38
-            #model = convertToSunRgb(model)
+    #for j in range(0,5):
+    for j in range(0,5):
+        dataset_status = "Original"
+        if j < 4:
+            sun_ann_dir = "C:/Users/UC/Desktop/sunrgb/test/seg/"
+            dataset_status = "Original"
         else:
-            model = model_from_name[model_config['model_class']](
-                model_config['n_classes'], input_height=model_config['input_height'],
-                input_width=model_config['input_width'])
-            n_classes = model_config['n_classes']
-        print("loaded weights ", latest_weights)
-        model.load_weights(latest_weights)
-        #print(model.summary())
-        folder = os.path.basename(folder)
-
-        out = model.predict_segmentation(
-            inp=sun_inp_dir+chosen_img,
-            out_fname=init+"/ipcv_out/"+folder+"_"+latest_weights[-2:]+"_"+chosen_img
-        )
+            sun_ann_dir = "C:/Users/UC/Desktop/fixed_segs/test/"
+            dataset_status = "Fixed"
         
-        opt = optimizers.Adam(learning_rate=10e-6)
-        loss_type = masked_jaccard_crossentropy
-        metrics_used = [masked_categorical_accuracy, metrics.MeanIoU(name='mean_iou', num_classes=n_classes)]
+        if j == 0 or j == 4:
+            handling = "None"
+        elif j == 1:
+            handling = "Mean"
+        elif j == 2:
+            handling = "Weighted"
+        elif j == 3:
+            handling = "Trustful"
+            
+        model_untrained = pspnet_50_ADE_20K_SUNRGB()
+        n_classes = 38
+        folder_untrained = "pspnet_50_ade20K_untrained"
         
         # evaluating the model 
         if evaluate:
-            evaluation = model.evaluate_segmentation( 
-                inp_images_dir=sun_inp_dir, 
-                annotations_dir=sun_ann_dir)#,
-                # optimizer=opt,
-                # loss=loss_type,
-                # metrics=metrics_used) 
-            print(evaluation)
+            evaluation_untrained = evaluate_segmentation(model_untrained, inp_images_dir=sun_inp_dir, 
+                annotations_dir=sun_ann_dir, zero_handling=handling, split_factor=split_factor)
+            print(evaluation_untrained)
+            evals = [evaluation_untrained]
+
+
+        for chosen_img in chosen_imgs: 
+            if j == 0 or j == 4:
+                i = 3
+                size = int(ceil(ceil(len(all_checkpoint_folders)+3)/2))
+                fig, axes = plt.subplots(2,size)
+                # Immagine Originale
+                img = plt.imread(sun_inp_dir+chosen_img)
+                axes[0][0].set_title('Original', fontsize=6)
+                axes[0][0].imshow(img)
+                # Immagine Segmentata
+                img2 = plt.imread(sun_ann_dir+chosen_img)
+                axes[0][1].set_title('Segmentation', fontsize=6)
+                axes[0][1].imshow(img2)
+                # Immagine
+                print("\nModel Evaluation: "+folder_untrained+"\n")
+                out = model_untrained.predict_segmentation(
+                    inp=sun_inp_dir+chosen_img,
+                    out_fname=init+"/ipcv_out/"+folder_untrained+"_"+dataset_status+"_"+chosen_img
+                )
+                
+                if evaluate:
+                    axes[0][2].set_title(
+                    folder_untrained+
+                    #"\n("+str(round(100*evaluation['loss'])/100)+
+                    #" - "+str(round(100*evaluation['accuracy'])/100)+
+                    "\n("+str(round(100*evaluation_untrained['frequency_weighted_IoU'])/100)+
+                    " - "+str(round(100*evaluation_untrained['mean_IoU'])/100)+")", fontsize=6)
+                    axes[0][2].imshow(out)
+                else:
+                    axes[0][2].set_title(folder_untrained, fontsize=6)
+                    axes[0][2].imshow(out)
+                
+                for folder in all_checkpoint_folders:
+                    #from models.all_models import model_from_name
+                    #model_from_name["vgg_unet"] = unet.vgg_unet
+                    full_config_path = folder+"\_config.json"
+                    #print(full_config_path)
+                    assert (os.path.isfile(full_config_path)
+                    #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
+                            ), "Checkpoint not found."
+                    model_config = json.loads(
+                        open(full_config_path, "r").read())
+                    #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
+                    latest_weights = find_latest_checkpoint(folder+"/")
+                    #assert (os.path.isfile("./"+checkpoints_path+".4")
+                            #), "Weights not found."
+                    #latest_weights = checkpoints_path+".4"
+                    assert (latest_weights is not None), "Weights not found."
+                    assert (os.path.isfile(latest_weights)), "Weights not found."
+                    #model = model_from_name[model_config['model_class']](
+                    
+                    if model_config['model_class'] == "" or model_config['model_class'] == "pspnet_50_sunrgb":
+                        model = pspnet_50_ADE_20K_SUNRGB()
+                        n_classes = 38
+                        #model = convertToSunRgb(model)
+                    else:
+                        model = model_from_name[model_config['model_class']](
+                            model_config['n_classes'], input_height=model_config['input_height'],
+                            input_width=model_config['input_width'])
+                        n_classes = model_config['n_classes']
+                    print("loaded weights ", latest_weights)
+                    model.load_weights(latest_weights)
+                    #print(model.summary())
+                    folder = os.path.basename(folder)
+                    
+                    # evaluating the model 
+                    if evaluate:
+                        evaluation = evaluate_segmentation(model, inp_images_dir=sun_inp_dir, 
+                            annotations_dir=sun_ann_dir, zero_handling="None", split_factor=split_factor)
+                        print(evaluation)
+                        evals.append(evaluation)
+                    
+                        
+                    print("\nModel Evaluation: "+folder+"\n")
+                    out = model.predict_segmentation(
+                        inp=sun_inp_dir+chosen_img,
+                        out_fname=init+"/ipcv_out/"+folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img
+                    )
+                     
+                    if evaluate:
+                        axes[int(i/size)][int((i)%size)].set_title(
+                            folder+"_"+
+                            latest_weights[-2:]+
+                            #"\n("+str(round(100*evaluation['loss'])/100)+
+                            #" - "+str(round(100*evaluation['accuracy'])/100)+
+                            "\n("+str(round(100*evaluation['frequency_weighted_IoU'])/100)+
+                            " - "+str(round(100*evaluation['mean_IoU'])/100)+")", fontsize=6)
+                        axes[int(i/size)][int((i)%size)].imshow(out)
+                    else:
+                        axes[int(i/size)][int((i)%size)].set_title(folder+"_"+latest_weights[-2:], fontsize=6)
+                        axes[int(i/size)][int((i)%size)].imshow(out)
             
-            axes[int(i/size)][int((i)%size)].set_title(
-                folder+"_"+
-                latest_weights[-2:]+
-                #"\n("+str(round(100*evaluation['loss'])/100)+
-                #" - "+str(round(100*evaluation['accuracy'])/100)+
-                "\n("+str(round(100*evaluation['frequency_weighted_IoU'])/100)+
-                " - "+str(round(100*evaluation['mean_IoU'])/100)+")", fontsize=6)
-            axes[int(i/size)][int((i)%size)].imshow(out)
-        else:
-            axes[int(i/size)][int((i)%size)].set_title(folder+"_"+latest_weights[-2:], fontsize=6)
-            axes[int(i/size)][int((i)%size)].imshow(out)
+                    i += 1
+                    
+                plt.show()
+                fig.set_size_inches(14,10)
+                plt.savefig(init+"/ipcv_out/all_models_"+dataset_status+"_"+chosen_img)
             
-        i += 1
-    
-    #mng = plt.get_current_fig_manager()
-    #mng.window.showMaximized()
-    plt.show()
-    fig.set_size_inches(14,10)
-    plt.savefig(init+"/ipcv_out/all_models_"+chosen_img)
+                print("\nImage: "+chosen_img+" - Model: "+folder_untrained+" - Zero handling: "+handling+" - Fixed dataset: "+str(j==5)+"\n")
+                display_list = [plt.imread(sun_inp_dir+chosen_img),
+                            plt.imread(sun_ann_dir+chosen_img),
+                            plt.imread(init+"/ipcv_out/"+folder_untrained+"_"+dataset_status+"_"+chosen_img[:-4]+"_gray.png")]
+                display(display_list, 
+                        folder_untrained+"_"+dataset_status+"_"+chosen_img, labels, height=8)
+                
+                for folder in all_checkpoint_folders:
+                    full_config_path = folder+"\_config.json"
+                    #print(full_config_path)
+                    assert (os.path.isfile(full_config_path)
+                    #assert (os.path.isfile("./"+checkpoints_path+"_config.json")
+                            ), "Checkpoint not found."
+                    model_config = json.loads(
+                        open(full_config_path, "r").read())
+                    #latest_weights = find_latest_checkpoint("./"+checkpoints_path)
+                    latest_weights = find_latest_checkpoint(folder+"/")
+                    #assert (os.path.isfile("./"+checkpoints_path+".4")
+                            #), "Weights not found."
+                    #latest_weights = checkpoints_path+".4"
+                    assert (latest_weights is not None), "Weights not found."
+                    assert (os.path.isfile(latest_weights)), "Weights not found."
+                    folder = os.path.basename(folder)
+                    print("\nImage: "+chosen_img+" - Model: "+folder_untrained+" - Zero handling: "+handling+" - Fixed dataset: "+str(j==5)+"\n")
+                    display_list = [plt.imread(sun_inp_dir+chosen_img),
+                            plt.imread(sun_ann_dir+chosen_img),
+                            plt.imread(init+"/ipcv_out/"+folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img[:-4]+"_gray.png")]
+                    display(display_list, 
+                            folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img, labels, 
+                            height=8)
+
+                #opt = optimizers.Adam(learning_rate=10e-6)
+                #loss_type = masked_jaccard_crossentropy
+                #metrics_used = [masked_categorical_accuracy, metrics.MeanIoU(name='mean_iou', num_classes=n_classes)]
+            else:
+                # evaluating the model 
+                if evaluate:
+                    evaluation = evaluate_segmentation(model, inp_images_dir=sun_inp_dir, 
+                        annotations_dir=sun_ann_dir, zero_handling="None", split_factor=split_factor)
+                    print(evaluation)
+                    evals.append(evaluation)
+        j += 1
+        
+    f.close()
+        
 elif mode == 2:
     #pretrained_model = pspnet_50_ADE_20K()
     #model = pspnet_50( n_classes=38 ) # accuracy: 0.5348 10 epochs
@@ -432,17 +503,20 @@ elif mode == 3:
             dpi=96,
         )
     
-    model1 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
+    #model1 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
     #model1 = convertToSunRgb(model1,distructive=False)
     #print(model1.summary())
     
-    sun_inp_dir = init+"half_sunrgb/test/rgb/"
-    sun_ann_dir = init+"half_sunrgb/test/seg/"
+    sun_inp_dir = init+"sunrgb/test/rgb/"
+    sun_ann_dir = init+"sunrgb/test/seg/"
     
-    model1 = pspnet_50_ADE_20K_SUNRGB(height=256,width=256)
+    model1 = pspnet_50_ADE_20K_SUNRGB()
+    
+    fix_dataset(model1,source_path="C:/Users/UC/Desktop/sunrgb/", 
+                destination_path="C:/Users/UC/Desktop/fixed_segs/")
     #model2 = convertToSunRgb(model2,distructive=False)
     
-    checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_trained_4/"
+    checkpoints_path = init+"ipcv_checkpoints/pspnet_50_20K_fixed_dataset/"
     full_config_path = checkpoints_path+"\_config.json"
     #print(full_config_path)
     assert (os.path.isfile(full_config_path)
@@ -458,24 +532,33 @@ elif mode == 3:
     assert (latest_weights is not None), "Weights not found."
     assert (os.path.isfile(latest_weights)), "Weights not found."
     #model = model_from_name[model_config['model_class']](
+    
+    ev1 = evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=4)
+    fw1 = ev1['frequency_weighted_IoU']
+    print(ev1)
 
     print("loaded weights ", latest_weights)
     model1.load_weights(latest_weights)
     
-    #fix_dataset(model1,checkpoints_path,source_path="C:/Users/UC/Desktop/sunrgb/", 
-                destination_path="C:/Users/UC/Desktop/fixed_segs/")
     
-    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
-                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=2))
     
-    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
-                   annotations_dir=sun_ann_dir, zero_handling="Mean", split_factor=2))
+    ev2 = evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=4)
+    fw2 = ev2['frequency_weighted_IoU']
+    print(ev2)
     
-    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
-                   annotations_dir=sun_ann_dir, zero_handling="Weighted", split_factor=2))
+    # print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+    #                annotations_dir=sun_ann_dir, zero_handling="Mean", split_factor=4))
     
-    print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
-                   annotations_dir=sun_ann_dir, zero_handling="Trustful", split_factor=2))
+    # print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+    #                annotations_dir=sun_ann_dir, zero_handling="Weighted", split_factor=4))
+    
+    # ev3 = evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
+    #                annotations_dir=sun_ann_dir, zero_handling="Trustful", split_factor=4)
+    # fw3 = ev3['frequency_weighted_IoU']
+    # print(ev3)
+    # print(fw2*fw3/fw1)
     
     sun_ann_dir="C:/Users/UC/Desktop/fixed_segs/test/"
     
@@ -483,7 +566,7 @@ elif mode == 3:
     # fix_dataset(model1,checkpoints_path)
     
     print(evaluate_segmentation(model1, inp_images_dir=sun_inp_dir, 
-                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=2))
+                   annotations_dir=sun_ann_dir, zero_handling="None", split_factor=4))
     
 
     
@@ -620,4 +703,4 @@ elif mode == 5:
     labels = json.load(open('labels.json'))
     for model in train_list:
         display_list = [plt.imread(sun_inp_dir+"img_00027.png"),plt.imread(sun_ann_dir+"img_00027.png"),plt.imread(pred_dir+model+"_img_00027_gray.png")]
-        display(display_list, labels, height=8, name=model)
+        display(display_list, "img_00027.png", labels, height=8, name=model)

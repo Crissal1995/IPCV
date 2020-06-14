@@ -530,7 +530,8 @@ def evaluate_segmentation(model=None, inp_images=None, annotations=None,
         #"accuracy": results[1],
         "frequency_weighted_IoU": frequency_weighted_IU,
         "mean_IoU": mean_IU,
-        "class_wise_IoU": cl_wise_score
+        "class_wise_IoU": cl_wise_score,
+        "pixels_per_class": n_pixels
     }
 
 def fix_zero_labeling(model=None, seg=None, inp=None, out_fname=None,
@@ -587,7 +588,7 @@ def fix_zero_labeling(model=None, seg=None, inp=None, out_fname=None,
 
 
 def fix_dataset(model,
-                checkpoints_path,
+                checkpoints_path=None,
                 source_path="C:/Users/UC/Desktop/half_sunrgb/", 
                 destination_path="C:/Users/UC/Desktop/fixed_segs/"):
     folder_path = source_path+"train/"
@@ -614,7 +615,7 @@ def fix_dataset(model,
         
     print("Test set converted")
 
-def display(display_list, labels, height=8, name=None):
+def display(display_list, image_name, labels, height=8, dest_dir="C:/Users/UC/Desktop/display_segs/"):
   l = len(display_list)
   assert l < 4, 'Fornire in ingresso al più 3 immagini'
 
@@ -633,8 +634,8 @@ def display(display_list, labels, height=8, name=None):
   def get_labels(values):
     return [label for key, label in labels_dict.items() if key in values]
 
-  if l == 3 and name != None:
-      fig.suptitle(name,fontsize=16)
+  if l == 3 and image_name != None:
+      fig.suptitle(image_name,fontsize=16)
 
   for i in range(l):
     x = display_list[i]
@@ -674,3 +675,5 @@ def display(display_list, labels, height=8, name=None):
   cb.ax.set_xticklabels(labels, rotation=75, size=8, ha='left')
   
   plt.show()
+  fig.set_size_inches(14,10)
+  plt.savefig(dest_dir+image_name)
