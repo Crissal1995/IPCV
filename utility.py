@@ -70,7 +70,8 @@ def split_dataset(
         data_dir=DATA_PATH,
         train_dir=TRAIN_PATH,
         val_dir=VAL_PATH,
-        test_dir=TEST_PATH
+        test_dir=TEST_PATH,
+        is_kaggle=False
 ):
     """
     train_val_test nel formato (train%, val%, test%)
@@ -104,9 +105,9 @@ def split_dataset(
 
     t = tqdm(total=2*NUM_ELEMENTS) if tqdm else None
 
-    _move_from_folder(train_elems, data_dir, train_dir, t)
-    _move_from_folder(val_elems, data_dir, val_dir, t)
-    _move_from_folder(test_elems, data_dir, test_dir, t)
+    _move_from_folder(train_elems, data_dir, train_dir, t, is_kaggle)
+    _move_from_folder(val_elems, data_dir, val_dir, t, is_kaggle)
+    _move_from_folder(test_elems, data_dir, test_dir, t, is_kaggle)
 
     if tqdm:
         t.close()
@@ -116,7 +117,7 @@ def split_dataset(
     assert count(test_dir) == test_elems
 
 
-def _move_from_folder(num_elem, from_dir, to_dir, tqdm_progress=None):
+def _move_from_folder(num_elem, from_dir, to_dir, tqdm_progress=None, is_kaggle=False):
     from_dir_rgb = from_dir / 'rgb'
     from_dir_seg = from_dir / 'seg'
 
@@ -143,8 +144,12 @@ def _move_from_folder(num_elem, from_dir, to_dir, tqdm_progress=None):
 
     assert len(selected_rgb) == len(selected_seg), 'Mismatch di elementi fra immagini e maschere!'
 
-    move(selected_rgb, to_dir_rgb, tqdm_progress)
-    move(selected_seg, to_dir_seg, tqdm_progress)
+    if not is_kaggle:
+        move(selected_rgb, to_dir_rgb, tqdm_progress)
+        move(selected_seg, to_dir_seg, tqdm_progress)
+    else:
+        copy(selected_rgb, to_dir_rgb, tqdm_progress)
+        copy(selected_seg, to_dir_seg, tqdm_progress)
 
 
 def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, test_dir=TEST_PATH):
@@ -190,6 +195,13 @@ def restore_dataset(data_dir=DATA_PATH, train_dir=TRAIN_PATH, val_dir=VAL_PATH, 
 def move(data, dir_, tqdm_progress=None):
     for d in data:
         shutil.move(str(d), str(dir_))
+        if tqdm_progress:
+            tqdm_progress.update()
+
+
+def copy(data, dir_, tqdm_progress=None):
+    for d in data:
+        shutil.copy(str(d), str(dir_))
         if tqdm_progress:
             tqdm_progress.update()
 
