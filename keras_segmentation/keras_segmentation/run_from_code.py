@@ -139,6 +139,7 @@ def pspnet_50_ADE_20K_SUNRGB(height=473,width=473):
 mode = 1
 trainingFromInit = True
 evaluate = True
+writeOnNotes = True
 
 if os.name == 'nt':
     init = "C:/Users/UC/Desktop/"
@@ -243,15 +244,18 @@ if mode == 0:
     #     ))
 elif mode == 1:
     import sys
-    f = open("C:/Users/UC/Desktop/test_models.out", 'w')
-    sys.stdout = f
+    if writeOnNotes:
+        f = open("C:/Users/UC/Desktop/test_models.out", 'w')
+        sys.stdout = f
     
-    sun_inp_dir = "C:/Users/UC/Desktop/test/rgb/"
-    sun_ann_dir = "C:/Users/UC/Desktop/test/seg/"
+    sun_inp_dir = "C:/Users/UC/Desktop/sunrgb/test/rgb/"
+    sun_ann_dir = "C:/Users/UC/Desktop/sunrgb/test/seg/"
     labels = json.load(open('labels.json'))
         
     split_factor = 1
     #chosen_imgs = ["img_00005.png","img_00027.png","img_02592.png","img_04521.png","img_06600.png"]
+    #chosen_imgs = ["img_00027.png"]
+    #chosen_imgs = ["img_07033.png"]
     chosen_imgs = ["img_00005.png"]
         
     checkpoints_path = init+"ipcv_checkpoints/"
@@ -260,7 +264,7 @@ elif mode == 1:
     from math import ceil
     
     #for j in range(0,5):
-    for j in range(0,5):
+    for j in range(1,2):
         dataset_status = "Original"
         if j < 4:
             sun_ann_dir = "C:/Users/UC/Desktop/sunrgb/test/seg/"
@@ -291,7 +295,7 @@ elif mode == 1:
 
 
         for chosen_img in chosen_imgs: 
-            if j == 0 or j == 4:
+            if j == 0 or j == 4 or j == 1:
                 i = 3
                 size = int(ceil(ceil(len(all_checkpoint_folders)+3)/2))
                 fig, axes = plt.subplots(2,size)
@@ -388,12 +392,13 @@ elif mode == 1:
                 fig.set_size_inches(14,10)
                 plt.savefig(init+"/ipcv_out/all_models_"+dataset_status+"_"+chosen_img)
             
-                print("\nImage: "+chosen_img+" - Model: "+folder_untrained+" - Zero handling: "+handling+" - Fixed dataset: "+str(j==5)+"\n")
-                display_list = [plt.imread(sun_inp_dir+chosen_img),
-                            plt.imread(sun_ann_dir+chosen_img),
-                            plt.imread(init+"/ipcv_out/"+folder_untrained+"_"+dataset_status+"_"+chosen_img[:-4]+"_gray.png")]
-                display(display_list, 
-                        folder_untrained+"_"+dataset_status+"_"+chosen_img, labels, height=8)
+                if evaluate == False:
+                    print("\nImage: "+chosen_img+" - Model: "+folder_untrained+" - Zero handling: "+handling+" - Fixed dataset: "+str(j==5)+"\n")
+                    display_list = [plt.imread(sun_inp_dir+chosen_img),
+                                plt.imread(sun_ann_dir+chosen_img),
+                                plt.imread(init+"/ipcv_out/"+folder_untrained+"_"+dataset_status+"_"+chosen_img[:-4]+"_gray.png")]
+                    display(display_list, 
+                            folder_untrained+"_"+dataset_status+"_"+chosen_img, labels, height=8)
                 
                 for folder in all_checkpoint_folders:
                     full_config_path = folder+"\_config.json"
@@ -411,13 +416,15 @@ elif mode == 1:
                     assert (latest_weights is not None), "Weights not found."
                     assert (os.path.isfile(latest_weights)), "Weights not found."
                     folder = os.path.basename(folder)
-                    print("\nImage: "+chosen_img+" - Model: "+folder_untrained+" - Zero handling: "+handling+" - Fixed dataset: "+str(j==5)+"\n")
-                    display_list = [plt.imread(sun_inp_dir+chosen_img),
-                            plt.imread(sun_ann_dir+chosen_img),
-                            plt.imread(init+"/ipcv_out/"+folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img[:-4]+"_gray.png")]
-                    display(display_list, 
-                            folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img, labels, 
-                            height=8)
+                    
+                    if evaluate == False:
+                        print("\nImage: "+chosen_img+" - Model: "+folder_untrained+" - Zero handling: "+handling+" - Fixed dataset: "+str(j==5)+"\n")
+                        display_list = [plt.imread(sun_inp_dir+chosen_img),
+                                plt.imread(sun_ann_dir+chosen_img),
+                                plt.imread(init+"/ipcv_out/"+folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img[:-4]+"_gray.png")]
+                        display(display_list, 
+                                folder+"_"+dataset_status+"_"+latest_weights[-2:]+"_"+chosen_img, labels, 
+                                height=8)
 
                 #opt = optimizers.Adam(learning_rate=10e-6)
                 #loss_type = masked_jaccard_crossentropy
@@ -430,8 +437,9 @@ elif mode == 1:
                     print(evaluation)
                     evals.append(evaluation)
         j += 1
-        
-    f.close()
+       
+    if writeOnNotes:
+        f.close()
         
 elif mode == 2:
     #pretrained_model = pspnet_50_ADE_20K()

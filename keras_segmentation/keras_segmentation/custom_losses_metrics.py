@@ -80,6 +80,24 @@ def generate_onehot(a):
     tf.print(onehot)
     return onehot
 
+# Custom summed losses
+def jaccard_crossentropy(out, tar):
+    return categorical_crossentropy(out, tar) + jaccard_distance(out, tar)
+
+def masked_jaccard_crossentropy(out, tar):
+    return masked_categorical_crossentropy(out, tar) + masked_jaccard_distance(out, tar)
+
+# Metrics
+# def mild_categorical_accuracy(y_true, y_pred):
+#     return K.cast(K.equal(K.argmax(y_true, axis=-1),
+#                           K.argmax(y_pred, axis=-1)),
+#                   K.floatx())
+
+def masked_categorical_accuracy(y_true, y_pred):
+    from keras.metrics import categorical_accuracy
+    mask = 1 - y_true[:, :, 0]
+    return categorical_accuracy(y_true, y_pred) * mask
+
 def mild_categorical_crossentropy(gt, pr):
     from keras.losses import categorical_crossentropy
     
@@ -99,20 +117,19 @@ def mild_categorical_crossentropy(gt, pr):
                     
     return categorical_crossentropy(gtf, pr)
 
-# Custom summed losses
-def jaccard_crossentropy(out, tar):
-    return categorical_crossentropy(out, tar) + jaccard_distance(out, tar)
-
-def masked_jaccard_crossentropy(out, tar):
-    return masked_categorical_crossentropy(out, tar) + masked_jaccard_distance(out, tar)
-
-# Metrics
-# def mild_categorical_accuracy(y_true, y_pred):
-#     return K.cast(K.equal(K.argmax(y_true, axis=-1),
-#                           K.argmax(y_pred, axis=-1)),
-#                   K.floatx())
-
-def masked_categorical_accuracy(y_true, y_pred):
-    from keras.metrics import categorical_accuracy
-    mask = 1 - y_true[:, :, 0]
-    return categorical_accuracy(y_true, y_pred) * mask
+def mild_jaccard_crossentropy(gt, pr):
+    gt0 = tf.zeros(shape=tf.shape(gt[:,:,0]))
+    gt0 = gt0[:,:,np.newaxis]
+    
+    # Metodo equiparante
+    # gt_0 = tf.divide(gt[:,:,0],37)
+    # gtx = tf.repeat(gt_0[:,:,np.newaxis],37,axis=2)
+    # gt1 = tf.add(gt[:,:,1:],gtx) 
+    # Metodo meritocratico
+    gtonehot = generate_onehot(pr[:,:,1:])
+    gtmask = tf.repeat(gt[:,:,0,np.newaxis],37,axis=2)
+    gtmult = tf.multiply(gtonehot,gtmask)
+    gt1 = tf.add(gt[:,:,1:],gtmult)
+    gtf = tf.concat([gt0,gt1],2)
+                    
+    return jaccard_crossentropy(gtf, pr)
