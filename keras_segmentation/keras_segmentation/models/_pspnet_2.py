@@ -18,6 +18,8 @@ learning_rate = 1e-3  # Layer specific learning rate
 # Weight decay not implemented
 
 def sunrgbize(x):
+    # 7 (table) = 16
+    # 17 (dresser) = 45
     sunrgb_class_range = [1,4,11,8,20,24,16,15,9,63,23,46,87,34,25,19,45,58,28,29,93,6,68,51,90,131,82,146,42,44,13,45,66,48,37,38,116]
     total_range = range(0,151)
     sub_range = [item for item in total_range if item not in sunrgb_class_range]
